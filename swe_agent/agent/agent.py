@@ -55,7 +55,7 @@ def get_crew(repo_path: str, workspace_id: str):
     ]
 
     # Define agent
-    agent = Agent(
+    agent = Ageeeeeeeeeee12312332nt(
         role=ROLE,
         goal=GOAL,
         backstory=BACKSTORY,
