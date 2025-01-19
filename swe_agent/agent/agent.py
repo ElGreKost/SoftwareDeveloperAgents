@@ -8,7 +8,8 @@ import typing as t
 from crewai import Agent, Crew, Process, Task
 from langchain_openai import ChatOpenAI
 from langchain_aws import ChatBedrock
-from prompts import BACKSTORY, DESCRIPTION, EXPECTED_OUTPUT, GOAL, ROLE
+from prompts import PLANNER_BACKSTORY, PLANNER_DESCRIPTION, PLANNER_EXPECTED_OUTPUT, PLANNER_GOAL, PLANNER_ROLE
+from prompts import EDITOR_BACKSTORY, EDITOR_DESCRIPTION, EDITOR_EXPECTED_OUTPUT, EDITOR_GOAL, EDITOR_ROLE
 
 from composio_crewai import Action, App, ComposioToolSet, WorkspaceType
 
@@ -25,7 +26,7 @@ model = Model.OPENAI
 if model == Model.OPENAI:
     client = ChatOpenAI(
         api_key=os.environ["OPENAI_API_KEY"],  # type: ignore
-        model="gpt-4-1106-preview",
+        model="gpt-3.5-turbo",
     )
 else:
     raise ValueError(f"Invalid model: {model}")
@@ -55,24 +56,39 @@ def get_crew(repo_path: str, workspace_id: str):
     ]
 
     # Define agent
-    agent = Ageeeeeeeeeee12312332nt(
-        role=ROLE,
-        goal=GOAL,
-        backstory=BACKSTORY,
+    planner = Agent(
+        role=PLANNER_ROLE,
+        goal=PLANNER_GOAL,
+        backstory=PLANNER_BACKSTORY,
         llm=client,
         tools=tools,
         verbose=True,
     )
 
-    task = Task(
-        description=DESCRIPTION,
-        expected_output=EXPECTED_OUTPUT,
-        agent=agent,
+    editor = Agent(
+        role=EDITOR_ROLE,
+        goal=EDITOR_GOAL,
+        backstory=EDITOR_BACKSTORY,
+        llm=client,
+        tools=tools,
+        verbose=True,
+    )
+
+    planner_task = Task(
+        description=PLANNER_DESCRIPTION,
+        expected_output=PLANNER_EXPECTED_OUTPUT,
+        agent=planner,
+    )
+
+    editor_task = Task(
+        description=EDITOR_DESCRIPTION,
+        expected_output=EDITOR_EXPECTED_OUTPUT,
+        agent=editor,
     )
 
     crew = Crew(
-        agents=[agent],
-        tasks=[task],
+        agents=[planner, editor],
+        tasks=[planner_task, editor_task],
         process=Process.sequential,
         verbose=True,
         cache=False,
