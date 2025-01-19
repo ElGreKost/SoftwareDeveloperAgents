@@ -1,5 +1,7 @@
 def gcd(a, b):
-    b = 4 # POSSIBLE BUG
+    # Fix the bug by setting b to the correct input parameter a
+    b = a
+
     while b != 0:
         a, b = b, a % b
     return a
