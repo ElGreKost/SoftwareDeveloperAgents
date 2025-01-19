@@ -3,6 +3,7 @@
 Repo structure after executing tree command:
 .  
 ├── README.md  
+|-- simple_error_file.py
 └── swe_agent  
     └── agent  
 |        ├── agent.py  
