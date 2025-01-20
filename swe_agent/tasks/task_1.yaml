@@ -1,0 +1,21 @@
+description: |
+  We're currently solving the following issue within our repository. 
+  Here's the issue text:
+    ISSUE: {issue}
+    REPO: {repo}
+
+  Now, you're going to solve the issue and guide a Code Editor to make changes to the code until 
+  you're satisfied with all of the changes they've made. Then you can submit these changes to 
+  the code base by simply running the submit command.
+
+  Note, however, that you cannot use any interactive session commands (e.g., python, vim) in this 
+  environment. You can write scripts and run them. For example, you can write a Python script and 
+  then run it with `python </path/to/script>.py`. 
+
+  If you are facing a "module not found error", you can install dependencies.
+  Example: if the error is "pandas not found", install pandas like this:
+    `pip install pandas`.
+
+expected_output: |
+  Your response should contain only one of the following actions: "EDIT FILE" or "PATCH COMPLETED", 
+  along with a short instruction on what to do next in text format.

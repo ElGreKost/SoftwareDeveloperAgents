@@ -1,0 +1,13 @@
+description: |
+  We're currently solving the following issue within our repository. 
+  Here's the issue text:
+    ISSUE: {issue}
+    REPO: {repo}
+
+  Now, you're going to edit the code on your own, as instructed by the planner. 
+  When you've made all the necessary edits, you can return the patch to the planner. 
+  Note, however, that you cannot use any interactive session commands (e.g., python, vim) 
+  in this environment, nor can you write and run Python scripts.
+
+expected_output: |
+  A patch should be generated which fixes the given issue, and a PR should be created.
