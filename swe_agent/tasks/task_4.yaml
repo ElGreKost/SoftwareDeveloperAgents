@@ -1,0 +1,8 @@
+name: "Suggest Versioning Commands"
+description: |
+  Based on this repository structure containing all the versioning related files:
+  {versioning_tree}
+  Determine the bash commands needed to install dependencies (e.g., pip install -r requirements.txt, conda env create -f environment.yml, poetry install, pipenv install) and handle versioning if applicable (e.g., bumpversion patch). 
+  If there are no recognized versioning or dependency files, provide an appropriate error or fallback message.
+expected_output: >
+  A set of bash commands

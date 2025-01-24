@@ -1,9 +1,7 @@
 name: "Suggest Test Commands"
 description: |
-  Based on this repository structure:
-  {repo_structure}Determine the bash commands needed to execute all tests such as python3 test1.py etc. If no tests are found, provide an appropriate error message.
-# expected_output: >
-#   A set of commands to run the tests, such as pytest or unittest commands.
-#   If no tests are found, provide an appropriate error message.
+  Based on this repository structure containing all the test related files:
+  {test_tree}
+  Determine the bash commands needed to execute all tests such as python3 test1.py etc. If no tests are found, provide an appropriate error message.
 expected_output: >
   A set of bash commands
