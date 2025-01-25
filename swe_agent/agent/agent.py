@@ -33,13 +33,15 @@ else:
 
 def get_crew(repo_path: str, workspace_id: str):
 
+    print("REPO PATH IS: ", repo_path)
+
     composio_toolset = ComposioToolSet(
-        workspace_config=WorkspaceType.Docker(),
-        metadata={
-            App.CODE_ANALYSIS_TOOL: {
-                "dir_to_index_path": repo_path,
-            }
-        },
+        # workspace_config=WorkspaceType.Docker(),
+        # metadata={
+        #     App.CODE_ANALYSIS_TOOL: {
+        #         "dir_to_index_path": repo_path,
+        #     }
+        # },
     )
     if workspace_id:
         composio_toolset.set_workspace_id(workspace_id)
@@ -50,7 +52,7 @@ def get_crew(repo_path: str, workspace_id: str):
             apps=[
                 App.FILETOOL,
                 App.SHELLTOOL,
-                App.CODE_ANALYSIS_TOOL,
+                # App.CODE_ANALYSIS_TOOL,
             ]
         ),
     ]

@@ -1,6 +1,9 @@
+import sys
+sys.path.append(r"C:\Users\kosti\PycharmProjects\SoftwareDeveloperAgents\swe_agent\agent")
+
 import argparse
 
-from agent import composio_toolset, crew
+from agent import get_crew
 
 from swekit.benchmark.run_evaluation import evaluate
 from swekit.config.store import IssueConfig
@@ -8,6 +11,12 @@ from swekit.config.store import IssueConfig
 
 def bench(workspace_id: str, issue_config: IssueConfig) -> str:
     """Run benchmark on the agent."""
+
+    # todo check if giving the issue_config.repo_name in get_crew works
+
+    print(issue_config)
+
+    crew, composio_toolset  = get_crew(issue_config.repo_name, workspace_id)
 
     # Set the workspace for the tools to run.
     composio_toolset.set_workspace_id(workspace_id)
