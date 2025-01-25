@@ -1,33 +1,33 @@
-# from inputs import from_github
-# import uuid
-# from agent import get_crew
-# from composio import Action
-# from tools import create_pr
-
 import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from github import Github
 import yaml
 from crewai import Task, Crew, Agent
-#from helpcode import gather_test_related_files
+# from helpcode import gather_test_related_files
 from helpcode.build_test_tree import build_test_tree
-from helpcode.build_versioning_tree import build_versioning_tree
-import shutil # to delete folders
-from git import Repo  
-from opentelemetry.trace import set_tracer_provider, NoOpTracerProvider
-
+from helpcode.build_versioning_tree import build_versioning_tree_and_snippets
+from helpcode.create_virtualenv_install_dependencies import create_virtualenv, install_dependencies
+from git import Repo
 
 import sys
+from pathlib import Path
+
 print(sys.path)
 
-#github_repo_name = "ntua-el19871/sample_repo"
+# Alternatively, if env_utils.py is in the same directory, adjust the import accordingly:
+# from env_utils import create_virtualenv, install_dependencies
+
+# Example GitHub repository names:
+# github_repo_name = "ntua-el19871/sample_repo"
 github_repo_name = "astropy/astropy"
+# github_repo_name = "django/django"
 
 def main() -> None:
 
     ############################### Load environment variables ########################################
-    load_dotenv() if not os.getenv("OPENAI_API_KEY") or not os.getenv("GITHUB_TOKEN") else None
+    if not os.getenv("OPENAI_API_KEY") or not os.getenv("GITHUB_TOKEN"):
+        load_dotenv()
     openai_api_key = os.getenv("OPENAI_API_KEY")
     github_token = os.getenv("GITHUB_TOKEN")
     if not openai_api_key:
@@ -35,53 +35,71 @@ def main() -> None:
     if not github_token:
         raise EnvironmentError("GITHUB_TOKEN is missing.")
 
-
     ############################### Initialize OpenAI model ###########################################
     ####################### now we have the client object which is our llm ############################
-    set_tracer_provider(NoOpTracerProvider())   #gt rid of the warning
+
     llm = ChatOpenAI(
         api_key=openai_api_key,  # Ensure this environment variable is set
         model="gpt-3.5-turbo",
     )
 
     response = llm.invoke("What is the capital of France?")
-    print(response)
+    print(f"OpenAI Response: {response}")
 
-    ############################### Initialize github ###########################################
+    ############################### Initialize GitHub ###########################################
     ####################### now we have the repo and issue objects ##############################
     github_client = Github(github_token)
     repo = github_client.get_repo(github_repo_name)
     repo_owner, repo_name = github_repo_name.split("/")
-    issue_number = int(input("Enter the GitHub issue number to process: "))
+    try:
+        issue_number = int(input("Enter the GitHub issue number to process: "))
+    except ValueError:
+        print("Invalid input. Please enter a numeric issue number.")
+        sys.exit(1)
     issue = repo.get_issue(number=issue_number)
-  
+
     ############################### Clone the Repository ###########################################
-    local_repo_path = f"./{repo_name}"  # Local directory to clone the repository
+    local_repo_path = Path(f"./{repo_name}")  # Local directory to clone the repository
     repo_url = repo.clone_url
     # Clone the repository directly without wrapping in a function
-    if os.path.exists(local_repo_path):
+    if local_repo_path.exists():
         print(f"Repository already cloned at {local_repo_path}")
     else:
         print(f"Cloning repository from {repo_url} to {local_repo_path}...")
-        Repo.clone_from(repo_url, local_repo_path)
-        print("Cloning completed successfully.")
+        try:
+            Repo.clone_from(repo_url, local_repo_path)
+            print("Cloning completed successfully.")
+        except Exception as e:
+            print(f"Error cloning repository: {e}")
+            sys.exit(1)
+
+    # ############################### Create and Activate Virtual Environment ###########################################
+    # venv_name = "repo_venv"
+    # venv_path = local_repo_path / venv_name
+
+    # if venv_path.exists():
+    #     print(f"Virtual environment '{venv_name}' already exists at {venv_path}")
+    # else:
+    #     print(f"Creating virtual environment '{venv_name}'...")
+    #     create_virtualenv(venv_path)
+
+    # ############################### Install Dependencies ###########################################
+    # print("Installing dependencies from pyproject.toml...")
+    # install_dependencies(venv_path, local_repo_path)
+
+    ############################### Additional Steps ###########################################
+    # Example: Running a script within the new virtual environment
+    # script_path = local_repo_path / 'your_script.py'
+    # if script_path.exists():
+    #     subprocess.check_call([str(venv_path / 'bin' / 'python'), str(script_path)])
+    # else:
+    #     print(f"Script {script_path} does not exist.")
+
+    print("Setup complete.")
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    sys.exit(0)
 
 
 
@@ -200,7 +218,7 @@ def main() -> None:
 
 
 
-    versioning_tree = build_versioning_tree(local_repo_path)
+    versioning_tree = build_versioning_tree_and_snippets(local_repo_path)
     print(versioning_tree)
 
 

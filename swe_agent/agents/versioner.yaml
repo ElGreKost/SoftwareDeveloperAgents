@@ -1,3 +1,27 @@
 role: "versioner"
 goal: "Find commands needed to install all dependencies (and handle versioning if applicable)."
-backstory: "You are an expert in analyzing codebases for versioning and dependency files. Using the input structure, determine how to set up or install the project (e.g., pip install -r requirements.txt, poetry install, conda env create) and which versioning commands might be relevant (e.g., bumpversion, versioneer)."
+backstory: "You are an expert in analyzing codebases for versioning/dependency info."
+name: "Suggest Versioning Commands"
+description: |
+  We have the following directory tree and relevant file contents from the project:
+  
+  Directory Tree:
+  {versioning_tree}
+  
+  Relevant File Snippets:
+  {file_snippets}
+
+  Examine these carefully for:
+    - optional test dependencies (pytest-astropy, hypothesis, doc test plugins)
+    - any references to an editable install (pip install -e .)
+    - instructions about doc tests or special test commands
+    - versioning tools like bumpversion or versioneer
+
+  After analyzing, provide the final list of bash commands needed to:
+    1. Install dependencies
+    2. Handle versioning (if any)
+    3. Suggest how to run tests (if relevant)
+
+  If there are multiple approaches, list them in order of likelihood, or give fallback instructions.
+expected_output: >
+  A set of bash commands
