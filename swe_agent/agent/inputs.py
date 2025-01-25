@@ -53,7 +53,8 @@ def _create_github_issue_validator(owner: str, name: str) -> t.Callable[[str], s
                 raise ValueError("No issue found with the given issue number")
 
         # If neither a file nor issue ID, treat as direct description text
-        return value
+        return 'No file or issue ID provided'
+
 
     return _github_issue_validator
 
