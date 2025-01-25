@@ -1,0 +1,7 @@
+openai
+python-dotenv
+pyyaml
+PyGithub
+GitPython
+langchain-openai
+crewai

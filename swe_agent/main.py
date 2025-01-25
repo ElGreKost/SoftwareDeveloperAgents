@@ -1,22 +1,21 @@
 import os
+import sys
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from pathlib import Path
 from github import Github
+from git import Repo
 import yaml
-from crewai import Task, Crew, Agent
-# from helpcode import gather_test_related_files
+from langchain_openai import ChatOpenAI
+
+from crewai import Agent, Crew, Task
+
+
+
+
 from helpcode.build_test_tree import build_test_tree
 from helpcode.build_versioning_tree import build_versioning_tree_and_snippets
 from helpcode.create_virtualenv_install_dependencies import create_virtualenv, install_dependencies
-from git import Repo
 
-import sys
-from pathlib import Path
-
-print(sys.path)
-
-# Alternatively, if env_utils.py is in the same directory, adjust the import accordingly:
-# from env_utils import create_virtualenv, install_dependencies
 
 # Example GitHub repository names:
 # github_repo_name = "ntua-el19871/sample_repo"
@@ -95,126 +94,14 @@ def main() -> None:
     # else:
     #     print(f"Script {script_path} does not exist.")
 
-    print("Setup complete.")
+    #print("Setup complete.")
 
 
 
-    sys.exit(0)
-
-
-
-
-
-    # def guess_dep_and_version_commands(repo_path):
-    #     """
-    #     Inspect a local repo path for common dependency/versioning files 
-    #     and guess which commands might be used for installing dependencies 
-    #     and handling versioning.
-    #     """
-    #     # We’ll store findings here
-    #     found_files = set()
-
-    #     # Walk the repo to find key files
-    #     for root, dirs, files in os.walk(repo_path):
-    #         # Avoid hidden or irrelevant dirs (you can refine this)
-    #         dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('__pycache__', 'build', 'dist')]
-            
-    #         for f in files:
-    #             # Lowercase name for easy matching
-    #             f_lower = f.lower()
-    #             # Track the full path and name
-    #             found_files.add(f_lower)
-
-    #     commands = []
-
-    #     # ---- DEPENDENCIES ----
-    #     # Priority 1: environment.yml (Conda)
-    #     if 'environment.yml' in found_files:
-    #         commands.append("conda env create -f environment.yml")
-
-    #     # Priority 2: Pipfile (Pipenv)
-    #     if 'pipfile' in found_files:
-    #         commands.append("pipenv install")
-
-    #     # Priority 3: pyproject.toml
-    #     # We can't be certain if it's Poetry or just PEP 517, 
-    #     # but let's guess:
-    #     if 'pyproject.toml' in found_files:
-    #         # Could parse the file content to see if [tool.poetry] is present
-    #         # For simplicity, let's guess both possibilities
-    #         commands.append("poetry install  # if using Poetry")
-    #         commands.append("pip install .   # if using PEP 517")
-
-    #     # Priority 4: requirements.txt
-    #     if 'requirements.txt' in found_files:
-    #         commands.append("pip install -r requirements.txt")
-
-    #     # Priority 5: setup.py (traditional)
-    #     if 'setup.py' in found_files:
-    #         commands.append("pip install .   # or python setup.py install")
-
-    #     # If no recognized config, might guess a readme or fallback
-    #     # e.g. commands.append("Check README.md or docs")
-
-    #     # ---- VERSIONING ----
-    #     # Bumpversion
-    #     if '.bumpversion.cfg' in found_files:
-    #         commands.append("bumpversion patch  # or minor/major if used")
-
-    #     # Versioneer
-    #     if 'versioneer.py' in found_files:
-    #         commands.append("# versioneer is used. Possibly 'python setup.py version' or check docs.")
-        
-    #     # Summarize
-    #     if not commands:
-    #         commands_str = "No obvious dependency/versioning strategy detected."
-    #     else:
-    #         commands_str = "\n".join(commands)
-
-    #     return commands_str
-
-
-    # recommended_commands = guess_dep_and_version_commands(local_repo_path)
-    # print("Potential dependency and versioning commands:\n")
-    # print(recommended_commands)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    #sys.exit(0)
 
 
     ############################### Get the repository test structure #######################################
-
 
 
 
@@ -296,22 +183,6 @@ def main() -> None:
 
     ############################### Kickoff the Crew ###########################################
 
-    # inputs = {
-    #     "planner": {"issue_title": issue.title, "issue_body": issue.body},
-    #     "editor": {"issue_title": issue.title, "repo_name": repo_name},
-    # }
-
-    # crew_1.kickoff(inputs)
-
-    # # Retrieve outputs
-    # task_1_output = task_1.output
-
-
-    # task_2_output = task_2.output
-
-    # inputx = {
-    #     "tester": {"repository structure": repo_structure_json}
-    # }
 
     crew_2.kickoff(inputs={"test_tree": test_tree, "versioning_tree": versioning_tree})
 
@@ -325,59 +196,6 @@ def main() -> None:
     # except Exception as e:
     #     print(f"Error during deleting the cloned repo: {e}")
 
-
-
-    # """Run the agent."""
-    # repo, issue = from_github()
-
-    # owner, repo_name = repo.split("/")
-    # crew, composio_toolset = get_crew(repo_path=f"/home/user/{repo_name}", workspace_id=None)
-    # crew.kickoff(
-    #     inputs={
-    #         "repo": repo,
-    #         "issue": issue,
-    #     }
-    # )
-    # composio_toolset.execute_action(
-    #     action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
-    #     params={"path": f"/home/user/{repo_name}"},
-    # )
-    # response = composio_toolset.execute_action(
-    #     action=Action.FILETOOL_GIT_PATCH,
-    #     params={},
-    # )
-    # branch_name = "test-branch-" + str(uuid.uuid4())[:4]
-    # git_commands = [
-    #     f"checkout -b {branch_name}",
-    #     "add -u",
-    #     "config --global user.email 'random@gmail.com'",
-    #     "config --global user.name 'random'",
-    #     f"commit -m '{issue}'",
-    #     f"push --set-upstream origin {branch_name}",
-    # ]
-    # for command in git_commands:
-    #     composio_toolset.execute_action(
-    #         action=Action.FILETOOL_GIT_CUSTOM,
-    #         params={"cmd": command},
-    #     )
-    # composio_toolset.execute_action(
-    #     action=create_pr,
-    #     params={
-    #         "owner": owner,
-    #         "repo": repo_name,
-    #         "head": branch_name,
-    #         "base": "master",
-    #         "title": "Composio generated PR",
-    #     },
-    # )  
-
-    # data = response.get("data", {})
-    # if data.get("error") and len(data["error"]) > 0:
-    #     print("Error:", data["error"])
-    # elif data.get("patch"):
-    #     print("=== Generated Patch ===\n" + data["patch"])
-    # else:
-    #     print("No output available")
 
 
 if __name__ == "__main__":

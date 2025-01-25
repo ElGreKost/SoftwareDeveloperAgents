@@ -1,8 +1,0 @@
-python-dotenv
-langchain
-openai
-opentelemetry-api
-opentelemetry-sdk
-PyGithub
-GitPython
-PyYAML
