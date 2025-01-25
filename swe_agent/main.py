@@ -1,21 +1,32 @@
 import os
 import sys
-from dotenv import load_dotenv
+import subprocess
+import shutil
+import tempfile
 from pathlib import Path
+from dotenv import load_dotenv
 from github import Github
 from git import Repo
-import yaml
 from langchain_openai import ChatOpenAI
-
 from crewai import Agent, Crew, Task
-
-
-
+import yaml
 
 from helpcode.build_test_tree import build_test_tree
 from helpcode.build_versioning_tree import build_versioning_tree_and_snippets
 from helpcode.create_virtualenv_install_dependencies import create_virtualenv, install_dependencies
 
+# Mapping of repository names to their respective test commands
+REPO_TEST_COMMANDS = {
+    "astropy/astropy": [
+        ["python", "-m", "pytest"],
+    ],
+    "django/django": [
+        ["python", "-m", "pip", "install", "-e", ".."],  # Install parent directory in editable mode
+        ["python", "-m", "pip", "install", "-r", "requirements/py3.txt"],
+        ["./runtests.py"],
+    ],
+    # Add more repositories and their commands here
+}
 
 # Example GitHub repository names:
 # github_repo_name = "ntua-el19871/sample_repo"
@@ -23,7 +34,6 @@ github_repo_name = "astropy/astropy"
 # github_repo_name = "django/django"
 
 def main() -> None:
-
     ############################### Load environment variables ########################################
     if not os.getenv("OPENAI_API_KEY") or not os.getenv("GITHUB_TOKEN"):
         load_dotenv()
@@ -35,8 +45,6 @@ def main() -> None:
         raise EnvironmentError("GITHUB_TOKEN is missing.")
 
     ############################### Initialize OpenAI model ###########################################
-    ####################### now we have the client object which is our llm ############################
-
     llm = ChatOpenAI(
         api_key=openai_api_key,  # Ensure this environment variable is set
         model="gpt-3.5-turbo",
@@ -46,7 +54,6 @@ def main() -> None:
     print(f"OpenAI Response: {response}")
 
     ############################### Initialize GitHub ###########################################
-    ####################### now we have the repo and issue objects ##############################
     github_client = Github(github_token)
     repo = github_client.get_repo(github_repo_name)
     repo_owner, repo_name = github_repo_name.split("/")
@@ -60,7 +67,6 @@ def main() -> None:
     ############################### Clone the Repository ###########################################
     local_repo_path = Path(f"./{repo_name}")  # Local directory to clone the repository
     repo_url = repo.clone_url
-    # Clone the repository directly without wrapping in a function
     if local_repo_path.exists():
         print(f"Repository already cloned at {local_repo_path}")
     else:
@@ -72,36 +78,79 @@ def main() -> None:
             print(f"Error cloning repository: {e}")
             sys.exit(1)
 
-    # ############################### Create and Activate Virtual Environment ###########################################
-    # venv_name = "repo_venv"
-    # venv_path = local_repo_path / venv_name
+    ############################### Create Temporary Virtual Environment ###########################################
+    with tempfile.TemporaryDirectory() as temp_venv_dir:
+        print(f"Creating temporary virtual environment at {temp_venv_dir}...")
+        try:
+            # Create virtual environment
+            subprocess.check_call([sys.executable, "-m", "venv", temp_venv_dir])
+            print("Temporary virtual environment created.")
+        except subprocess.CalledProcessError as e:
+            print(f"Error creating virtual environment: {e}")
+            sys.exit(1)
 
-    # if venv_path.exists():
-    #     print(f"Virtual environment '{venv_name}' already exists at {venv_path}")
-    # else:
-    #     print(f"Creating virtual environment '{venv_name}'...")
-    #     create_virtualenv(venv_path)
+        # Define paths
+        venv_python = Path(temp_venv_dir) / ("Scripts" if os.name == "nt" else "bin") / "python"
+        if not venv_python.exists():
+            print(f"Python executable not found in the virtual environment at {venv_python}")
+            sys.exit(1)
 
-    # ############################### Install Dependencies ###########################################
-    # print("Installing dependencies from pyproject.toml...")
-    # install_dependencies(venv_path, local_repo_path)
+        ############################### Install Dependencies with Extras ###########################################
+        print("Installing dependencies from pyproject.toml with [test] extras...")
+        try:
+            # Upgrade pip in the temp venv
+            subprocess.check_call([str(venv_python), "-m", "pip", "install", "--upgrade", "pip"])
+            
+            # Navigate to the cloned repo
+            repo_dir = local_repo_path.resolve()
+            # Install the package in editable mode along with [test] extras
+            subprocess.check_call([str(venv_python), "-m", "pip", "install", "-e", ".[test]"], cwd=str(repo_dir))
+            print("Dependencies with [test] extras installed successfully.")
+        except subprocess.CalledProcessError as e:
+            print(f"Error installing dependencies: {e}")
+            sys.exit(1)
 
-    ############################### Additional Steps ###########################################
-    # Example: Running a script within the new virtual environment
-    # script_path = local_repo_path / 'your_script.py'
-    # if script_path.exists():
-    #     subprocess.check_call([str(venv_path / 'bin' / 'python'), str(script_path)])
-    # else:
-    #     print(f"Script {script_path} does not exist.")
+        ############################### Verify Pytest Installation ###########################################
+        print("Verifying pytest installation...")
+        try:
+            subprocess.check_call([str(venv_python), "-m", "pytest", "--version"], cwd=str(repo_dir))
+            print("Pytest is installed correctly.")
+        except subprocess.CalledProcessError:
+            print("Pytest is not installed in the virtual environment.")
+            sys.exit(1)
 
-    #print("Setup complete.")
+        ############################### Run Repository-Specific Commands ###########################################
+        print(f"Running test commands for repository: {github_repo_name}")
+        commands = REPO_TEST_COMMANDS.get(github_repo_name)
+        if not commands:
+            print(f"No test commands defined for repository: {github_repo_name}")
+            sys.exit(1)
 
+        for idx, cmd in enumerate(commands, start=1):
+            print(f"Executing command {idx}: {' '.join(cmd)}")
+            try:
+                # Determine the working directory
+                if github_repo_name == "django/django" and cmd == ["./runtests.py"]:
+                    # For django/django, ensure we're in the 'tests' directory before running runtests.py
+                    test_dir = repo_dir / "tests"
+                    if not test_dir.exists():
+                        print(f"Tests directory does not exist at {test_dir}")
+                        sys.exit(1)
+                    subprocess.check_call(cmd, cwd=str(test_dir))
+                else:
+                    # For other commands, execute in the repository's root directory
+                    subprocess.check_call(cmd, cwd=str(repo_dir))
+                print(f"Command {idx} executed successfully.")
+            except subprocess.CalledProcessError as e:
+                print(f"Error executing command {idx}: {' '.join(cmd)}")
+                print(f"Command failed with exit code {e.returncode}")
+                sys.exit(1)
 
+        # Temporary virtual environment and all its contents will be deleted here
+        print("Cleaning up temporary virtual environment...")
 
-    #sys.exit(0)
-
-
-    ############################### Get the repository test structure #######################################
+    ############################### Rollback is implicit by deleting the temp venv ###########################################
+    print("Environment rolled back to the original state.")
 
 
 
