@@ -16,7 +16,7 @@ def bench(workspace_id: str, issue_config: IssueConfig) -> str:
 
     print(issue_config)
 
-    crew, composio_toolset  = get_crew(issue_config.repo_name, workspace_id)
+    crew, composio_toolset  = get_crew("/home/user/" + issue_config.repo_name, workspace_id)
 
     # Set the workspace for the tools to run.
     composio_toolset.set_workspace_id(workspace_id)

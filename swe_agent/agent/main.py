@@ -7,6 +7,8 @@ from tools import create_pr
 def main() -> None:
     """Run the agent."""
     repo, issue = from_github()
+    print("REPO", repo)
+    print("ISSUE", issue)
 
     owner, repo_name = repo.split("/")
     crew, composio_toolset = get_crew(repo_path=f"/home/user/{repo_name}", workspace_id=None)
