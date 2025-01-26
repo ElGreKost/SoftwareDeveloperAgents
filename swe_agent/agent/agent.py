@@ -6,6 +6,13 @@ from crewai import LLM
 import dotenv
 import typing as t
 from crewai import Agent, Crew, Process, Task
+from crewai import LLM
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+gemini_llm = LLM(
+    model="gemini/gemini-1.5-pro-002",
+    api_key=GEMINI_API_KEY,
+    temperature=0,
+)
 from langchain_openai import ChatOpenAI
 from langchain_aws import ChatBedrock
 from prompts import PLANNER_BACKSTORY, PLANNER_DESCRIPTION, PLANNER_EXPECTED_OUTPUT, PLANNER_GOAL, PLANNER_ROLE
@@ -33,15 +40,13 @@ else:
 
 def get_crew(repo_path: str, workspace_id: str):
 
-    print("REPO PATH IS: ", repo_path)
-
     composio_toolset = ComposioToolSet(
-        workspace_config=WorkspaceType.Docker(),
-        metadata={
-            App.CODE_ANALYSIS_TOOL: {
-                "dir_to_index_path": repo_path,
-            }
-        },
+        # workspace_config=WorkspaceType.Docker(),
+        # metadata={
+        #     App.CODE_ANALYSIS_TOOL: {
+        #         "dir_to_index_path": repo_path,
+        #     }
+        # },
     )
     if workspace_id:
         composio_toolset.set_workspace_id(workspace_id)
@@ -58,11 +63,12 @@ def get_crew(repo_path: str, workspace_id: str):
     ]
 
     # Define agent
+    # Define agent
     planner = Agent(
         role=PLANNER_ROLE,
         goal=PLANNER_GOAL,
         backstory=PLANNER_BACKSTORY,
-        llm=client,
+        llm=gemini_llm,
         tools=tools,
         verbose=True,
     )
@@ -71,7 +77,7 @@ def get_crew(repo_path: str, workspace_id: str):
         role=EDITOR_ROLE,
         goal=EDITOR_GOAL,
         backstory=EDITOR_BACKSTORY,
-        llm=client,
+        llm=gemini_llm,
         tools=tools,
         verbose=True,
     )

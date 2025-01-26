@@ -1,4 +1,5 @@
 from inputs import from_github
+from pathlib import Path
 import uuid
 from agent import get_crew
 from composio import Action
@@ -7,11 +8,8 @@ from tools import create_pr
 def main() -> None:
     """Run the agent."""
     repo, issue = from_github()
-    print("REPO", repo)
-    print("ISSUE", issue)
-
     owner, repo_name = repo.split("/")
-    crew, composio_toolset = get_crew(repo_path=f"/home/user/{repo_name}", workspace_id=None)
+    crew, composio_toolset = get_crew(repo_path=Path(Path.home(), repo_name), workspace_id=None)
     crew.kickoff(
         inputs={
             "repo": repo,
@@ -20,7 +18,7 @@ def main() -> None:
     )
     composio_toolset.execute_action(
         action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
-        params={"path": f"/home/user/{repo_name}"},
+        params={"path": Path(Path.home(), repo_name)},
     )
     response = composio_toolset.execute_action(
         action=Action.FILETOOL_GIT_PATCH,
