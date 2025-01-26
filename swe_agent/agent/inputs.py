@@ -46,7 +46,7 @@ def _create_github_issue_validator(owner: str, name: str) -> t.Callable[[str], s
                     "repo": name,
                     "issue_number": int(value),
                 },
-            ).get("response_data")
+            ).get("data")
             if response_data:
                 return response_data["body"]
             else:

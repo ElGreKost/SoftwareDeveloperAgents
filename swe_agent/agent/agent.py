@@ -6,6 +6,13 @@ from crewai import LLM
 import dotenv
 import typing as t
 from crewai import Agent, Crew, Process, Task
+from crewai import LLM
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+gemini_llm = LLM(
+    model="gemini/gemini-1.5-pro-002",
+    api_key=GEMINI_API_KEY,
+    temperature=0,
+)
 from langchain_openai import ChatOpenAI
 from langchain_aws import ChatBedrock
 from prompts import BACKSTORY, DESCRIPTION, EXPECTED_OUTPUT, GOAL, ROLE
@@ -25,7 +32,7 @@ model = Model.OPENAI
 if model == Model.OPENAI:
     client = ChatOpenAI(
         api_key=os.environ["OPENAI_API_KEY"],  # type: ignore
-        model="gpt-4-1106-preview",
+        model="gpt-3.5-turbo",
     )
 else:
     raise ValueError(f"Invalid model: {model}")
@@ -33,12 +40,12 @@ else:
 def get_crew(repo_path: str, workspace_id: str):
 
     composio_toolset = ComposioToolSet(
-        workspace_config=WorkspaceType.Docker(),
-        metadata={
-            App.CODE_ANALYSIS_TOOL: {
-                "dir_to_index_path": repo_path,
-            }
-        },
+        # workspace_config=WorkspaceType.Docker(),
+        # metadata={
+        #     App.CODE_ANALYSIS_TOOL: {
+        #         "dir_to_index_path": repo_path,
+        #     }
+        # },
     )
     if workspace_id:
         composio_toolset.set_workspace_id(workspace_id)
@@ -49,17 +56,18 @@ def get_crew(repo_path: str, workspace_id: str):
             apps=[
                 App.FILETOOL,
                 App.SHELLTOOL,
-                App.CODE_ANALYSIS_TOOL,
+                # App.CODE_ANALYSIS_TOOL,
             ]
         ),
     ]
 
     # Define agent
-    agent = Ageeeeeeeeeee12312332nt(
+    agent = Agent(
         role=ROLE,
         goal=GOAL,
         backstory=BACKSTORY,
-        llm=client,
+        # llm=client,
+        llm=gemini_llm,
         tools=tools,
         verbose=True,
     )
