@@ -15,23 +15,80 @@ from helpcode.build_test_tree import build_test_tree
 from helpcode.build_versioning_tree import build_versioning_tree_and_snippets
 from helpcode.create_virtualenv_install_dependencies import create_virtualenv, install_dependencies
 
+
+##sudo apt install libmemcached-dev
+#sudo apt-get install pybind11-dev
+##sudo apt install -y libfreetype6-dev libpng-dev
+
 # Mapping of repository names to their respective test commands
 REPO_TEST_COMMANDS = {
     "astropy/astropy": [
         ["python", "-m", "pytest"],
     ],
     "django/django": [
-        ["python", "-m", "pip", "install", "-e", ".."],  # Install parent directory in editable mode
-        ["python", "-m", "pip", "install", "-r", "requirements/py3.txt"],
-        ["./runtests.py"],
+        ["python", "-m", "pip", "install", "-e", "."],  # Install parent directory in editable mode
+        ["python", "-m", "pip", "install", "-r", "tests/requirements/py3.txt"],
+        ["python", "tests/runtests.py"],
     ],
-    # Add more repositories and their commands here
+    "matplotlib/matplotlib": [
+        # Step 1: Upgrade pip, setuptools, wheel
+        ["python3", "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"],
+
+        # Step 2: Install Python build dependencies
+        ["python3", "-m", "pip", "install", "meson-python>=0.13.1"],
+        ["python3", "-m", "pip", "install", "ninja>=1.8.2"],
+        ["python3", "-m", "pip", "install", "pybind11>=2.13.2"],
+        ["python3", "-m", "pip", "install", "setuptools_scm>=7"],
+        ["python3", "-m", "pip", "install", "numpy>=1.22"],
+
+        # Step 3: Install mandatory runtime Python dependencies
+        ["python3", "-m", "pip", "install",
+            "contourpy>=1.0.1",
+            "cycler>=0.10.0",
+            "python-dateutil>=2.7",
+            "fonttools>=4.22.0",
+            "kiwisolver>=1.3.1",
+            "packaging>=20.0",
+            "Pillow>=9.0",
+            "pyparsing>=2.3.1"
+        ],
+
+        # Step 4: Install optional Python dependencies to extend Matplotlib's capabilities
+        ["python3", "-m", "pip", "install",
+            "PyQt6>=6.1",
+            "PySide6",
+            "PyQt5>=5.12",
+            "PySide2",
+            "PyGObject",
+            "pycairo>=1.14.0",
+            "cairocffi>=0.8",
+            "wxPython>=4",
+            "Tornado>=5",
+            "ipykernel"
+        ],
+
+        # Step 5: Install dev dependencies (tests, etc.) - adjust paths if needed
+        ["python3", "-m", "pip", "install", "-r", "requirements/dev/dev-requirements.txt"],
+
+        # Step 6: Install build-specific dependencies
+        ["python3", "-m", "pip", "install", "-r", "requirements/dev/build-requirements.txt"],
+
+        # Step 7: Install Matplotlib (in editable mode, for development) with Meson
+        ["python3", "-m", "pip", "install", "--verbose", "--no-build-isolation", "--editable", ".[dev]"],
+
+        # Step 8: Verify the installation
+        ["python3", "-c", "import matplotlib; print(matplotlib.__file__)"],
+
+        # Step 9: Run tests to ensure everything is set up correctly
+        ["python3", "-m", "pytest"]
+    ],
 }
 
 # Example GitHub repository names:
 # github_repo_name = "ntua-el19871/sample_repo"
 github_repo_name = "astropy/astropy"
-# github_repo_name = "django/django"
+github_repo_name = "django/django"
+github_repo_name = "matplotlib/matplotlib"
 
 def main() -> None:
     ############################### Load environment variables ########################################
@@ -74,6 +131,8 @@ def main() -> None:
         try:
             Repo.clone_from(repo_url, local_repo_path)
             print("Cloning completed successfully.")
+            # Change directory to the cloned repository
+            #os.chdir(local_repo_path)
         except Exception as e:
             print(f"Error cloning repository: {e}")
             sys.exit(1)
@@ -104,20 +163,21 @@ def main() -> None:
             # Navigate to the cloned repo
             repo_dir = local_repo_path.resolve()
             # Install the package in editable mode along with [test] extras
-            subprocess.check_call([str(venv_python), "-m", "pip", "install", "-e", ".[test]"], cwd=str(repo_dir))
+            #subprocess.check_call([str(venv_python), "-m", "pip", "install", "-e", ".[test]"], cwd=str(repo_dir))
+            #subprocess.check_call([str(venv_python), "-m", "pip", "install", "-e", "."], cwd=str(repo_dir))
             print("Dependencies with [test] extras installed successfully.")
         except subprocess.CalledProcessError as e:
             print(f"Error installing dependencies: {e}")
             sys.exit(1)
 
         ############################### Verify Pytest Installation ###########################################
-        print("Verifying pytest installation...")
-        try:
-            subprocess.check_call([str(venv_python), "-m", "pytest", "--version"], cwd=str(repo_dir))
-            print("Pytest is installed correctly.")
-        except subprocess.CalledProcessError:
-            print("Pytest is not installed in the virtual environment.")
-            sys.exit(1)
+        # print("Verifying pytest installation...")
+        # try:
+        #     subprocess.check_call([str(venv_python), "-m", "pytest", "--version"], cwd=str(repo_dir))
+        #     print("Pytest is installed correctly.")
+        # except subprocess.CalledProcessError:
+        #     print("Pytest is not installed in the virtual environment.")
+        #     sys.exit(1)
 
         ############################### Run Repository-Specific Commands ###########################################
         print(f"Running test commands for repository: {github_repo_name}")
@@ -130,7 +190,7 @@ def main() -> None:
             print(f"Executing command {idx}: {' '.join(cmd)}")
             try:
                 # Determine the working directory
-                if github_repo_name == "django/django" and cmd == ["./runtests.py"]:
+                if github_repo_name == "django/django" and "./runtests.py" in cmd:
                     # For django/django, ensure we're in the 'tests' directory before running runtests.py
                     test_dir = repo_dir / "tests"
                     if not test_dir.exists():
@@ -151,6 +211,7 @@ def main() -> None:
 
     ############################### Rollback is implicit by deleting the temp venv ###########################################
     print("Environment rolled back to the original state.")
+
 
 
 
