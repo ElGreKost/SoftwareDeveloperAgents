@@ -2,7 +2,7 @@ import os
 from inputs import from_github
 from pathlib import Path
 import uuid
-# from agent import get_crew
+from agent import get_crew
 from single_agent import get_crew as get_single_crew
 from composio import Action
 from tools import create_pr
@@ -11,7 +11,7 @@ def main() -> None:
     """Run the agent."""
     repo, issue = from_github()
     owner, repo_name = repo.split("/")
-    crew, composio_toolset = get_single_crew(workspace_id=None)
+    crew, composio_toolset = get_crew(workspace_id=None)
 
 
     composio_tests_workdir = Path(Path.home(), "composio_tests")

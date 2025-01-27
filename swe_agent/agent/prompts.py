@@ -79,6 +79,17 @@ PLANNER_DESCRIPTION = """We're currently solving the following issue within our 
 Here's the issue text:
   ISSUE: {issue}
   REPO: {repo}
+  NOTE: The problematic file is seaborn/_stats/regression.py
+  
+  NOTE: The problematic file is seaborn/seaborn/_stats/regression.py first make sure that it exists with git repo tree tool 
+  
+  STEPS:
+  1. Understand the GitHub Issue:
+  2. See all the files in the current directory with FILETOOL_LIST_FILES action:
+  3. Clone the repo
+  4. See all the files in the current directory now with the git repo in the file system and create a plan to solve the issue.
+  5. Open the files you think should be examined and read the code. 
+  6. if you think you have enough information call EDIT FILE so that the Editor can edit the code.
 
 Now, you're going solve the issue and guide a Code Editor to make changes to the code until you're 
 satisfied with all of the changes he's made. Then you can submit these changes to the code base by 
@@ -231,6 +242,7 @@ DESCRIPTION = """We're currently solving the following issue within our reposito
 Here's the issue text:
   ISSUE: {issue}
   REPO: {repo}
+  NOTE: The problematic file is seaborn/seaborn/_stats/regression.py first make sure that it exists with git repo tree tool 
 
 Now, you're going to solve this issue on your own. When you're satisfied with all
 of the changes you've made, you can submit your changes to the code base by simply
