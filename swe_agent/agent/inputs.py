@@ -33,7 +33,7 @@ def _create_github_issue_validator(owner: str, name: str) -> t.Callable[[str], s
     """Create a github issue validator."""
 
     def _github_issue_validator(value: str) -> str:
-        """Validate github issue."""
+        """Validate GitHub issue."""
         # Check if it's a file path
         if Path(value).resolve().exists():
             return Path(value).read_text(encoding="utf-8")

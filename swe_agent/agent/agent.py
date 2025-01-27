@@ -9,7 +9,7 @@ from crewai import Agent, Crew, Process, Task
 from crewai import LLM
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_llm = LLM(
-    model="gemini/gemini-1.5-pro-002",
+    model="gemini/gemini-2.0-flash-exp",
     api_key=GEMINI_API_KEY,
     temperature=0,
 )
@@ -38,15 +38,10 @@ if model == Model.OPENAI:
 else:
     raise ValueError(f"Invalid model: {model}")
 
-def get_crew(repo_path: str, workspace_id: str):
+def get_crew(workspace_id: str):
 
     composio_toolset = ComposioToolSet(
         # workspace_config=WorkspaceType.Docker(),
-        # metadata={
-        #     App.CODE_ANALYSIS_TOOL: {
-        #         "dir_to_index_path": repo_path,
-        #     }
-        # },
     )
     if workspace_id:
         composio_toolset.set_workspace_id(workspace_id)
