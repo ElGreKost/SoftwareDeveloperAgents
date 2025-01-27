@@ -5,7 +5,6 @@ def gcd(a, b):
     return a
 
 if __name__ == '__main__':
-    # Παράδειγμα χρήσης
     num1 = 56
     num2 = 98
     result = gcd(num1, num2)
