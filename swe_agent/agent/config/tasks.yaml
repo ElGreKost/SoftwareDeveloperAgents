@@ -1,46 +1,49 @@
-research_task:
-  description: >
-    Conduct a thorough research about {topic}
-    Make sure you find any interesting and relevant information given
-    the current year is 2024.
-  expected_output: >
-    A list with 10 bullet points of the most relevant information about {topic}
-  agent: researcher
+planner_task:
+    description: |
+      We're currently solving the following issue within our repository. 
+      Here's the issue text:
+        ISSUE: {issue}
+        REPO: {repo}
+        NOTE: The problematic file is seaborn/_stats/regression.py
 
-reporting_task:
-  description: >
-    Review the context you got and expand each topic into a full section for a report.
-    Make sure the report is detailed and contains any and all relevant information.
-  expected_output: >
-    A fully fledge reports with the mains topics, each with a full section of information.
-    Formatted as markdown without '```'
-  agent: reporting_analyst
-  output_file: report.md
+        NOTE: The problematic file is seaborn/seaborn/_stats/regression.py first\ make sure that it exists with git 
+      repo tree tool 
 
-git_analysis_task:
-  description: >
-    Clone the project, generate and read the repo tree and read the README.md files if they exist.
-  expected_output: > 
-    A summary of structured hierarchical summary of the codebase 
-    with clear distinction between the files that help accomplish the main goal of the repository and the auxiliary 
-    files that provide secondary functionality and extra utilities.
+        STEPS:
+        1. Understand the GitHub Issue:
+        2. See all the files in the current directory with FILETOOL_LIST_FILES action:
+        3. Clone the repo
+        4. See all the files in the current directory now with the git repo in the file system and create a plan to solve the issue.
+        5. Open the files you think should be examined and read the code. 
+        6. if you think you have enough information call EDIT FILE so that the Editor can edit the code.
 
+      Now, you're going solve the issue and guide a Code Editor to make changes to the code until you're 
+      satisfied with all of the changes he's made. Then you can submit these changes to the code base by 
+      simply running the submit command. Note however that you cannot use any interactive
+      session commands (e.g. python, vim) in this environment, but you can write
+      scripts and run them. E.g. you can write a python script and then run it
+      with `python </path/to/script>.py`. Note however that you cannot use 
+      any interactive session commands (e.g. python, vim), 
 
-party_shopping_task:
-  description: >
-    Generate a shopping list for a party with old doctor colleagues.
-    The list should include all necessary supplies in a bullet point format, 
-    categorized into food, beverages, and miscellaneous.
-  expected_output: >
-    A structured bullet point list of items categorized into food, beverages, and miscellaneous.
-  agent: party_planner
-shopping_prices_task:
-  description: >
-    Read the generated shopping list and assign prices for each item.
-    Ensure the prices reflect a reasonable cost for 2024.
-    Output the updated shopping list with each item followed by its price.
-  expected_output: >
-    A structured shopping list where each item has a price, formatted as:
-      - Item: [Name] - Price: $[value]
-      - Example: Bread - Price: $2.50
-  agent: pricing_analyzer
+      If you are facing "module not found error", you can install dependencies.
+      Example: in case error is "pandas not found", install pandas like this `pip install pandas`
+    expected_output: |
+      Your response should contain only one of the following actions:
+      "EDIT FILE", "PATCH COMPLETED",
+      along with a short instruction on what to do next in txt format.
+    agent: planner_agent
+
+editor_task:
+    description: |
+      We're currently solving the following issue within our repository. 
+      Here's the issue text:
+        ISSUE: {issue}
+        REPO: {repo}
+
+      Now, you're going to edit the code on your own, as instructed by the planner. 
+      When you've made all the necessary edits, you can return the patch to the planner. Note 
+      however that you cannot use any interactive session commands (e.g. python, vim) in this
+      environment, nor write and run python scripts.
+    expected_output:
+      A patch should be generated which fixes the given issue and a PR should be created
+    agent: editor_agent

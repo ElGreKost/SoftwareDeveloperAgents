@@ -5,8 +5,8 @@ from enum import Enum
 from crewai import LLM
 import dotenv
 import typing as t
-from crewai import Agent, Crew, Process, Task
-from crewai import LLM
+from crewai import Agent, Crew, Process, Task, LLM
+from crewai.project import agent, task, CrewBase, crew
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_llm = LLM(
     model="gemini/gemini-2.0-flash-exp",
@@ -44,6 +44,42 @@ if model == Model.OPENAI:
     )
 else:
     raise ValueError(f"Invalid model: {model}")
+
+
+@CrewBase
+class ProblemSolversCrew:
+    agents_config: str | dict = "config/agents.yaml"
+    tasks_config: str | dict = "config/tasks.yaml"
+
+    @agent
+    def planner(self) -> Agent:
+        return Agent(
+            config=self.agents_config["planner_agent"],
+            llm=gemini_llm,
+        )
+    @agent
+    def editor(self) -> Agent:
+        return Agent(
+            config=self.agents_config["coder_agent"],
+            llm=gemini_llm,
+        )
+    @task
+    def planner_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["editor_task"],
+        )
+    @task
+    def editor_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["editor_task"],
+        )
+    def crew(self) -> Crew:
+        return Crew(
+            agents=[self.planner, self.editor],
+            tasks=[self.planner_task, self.editor_task],
+            process=Process.sequential,
+            verbose=True
+        )
 
 def get_crew(workspace_id: str):
 
