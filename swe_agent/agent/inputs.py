@@ -41,11 +41,7 @@ def _create_github_issue_validator(owner: str, name: str) -> t.Callable[[str], s
         if re.match(r"^\d+$", value):
             response_data = ComposioToolSet().execute_action(
                 action=Action.GITHUB_GET_AN_ISSUE,
-                params={
-                    "owner": owner,
-                    "repo": name,
-                    "issue_number": int(value),
-                },
+                params=dict(owner=owner, repo=name, issue_number=int(value)),
             ).get("data")
             if response_data:
                 return response_data["body"]

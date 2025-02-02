@@ -6,6 +6,7 @@ import dotenv
 import typing as t
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import agent, task, CrewBase, crew
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_llm = LLM(
     model="gemini/gemini-2.0-flash-exp",
@@ -26,12 +27,13 @@ from prompts import EDITOR_BACKSTORY, EDITOR_DESCRIPTION, EDITOR_EXPECTED_OUTPUT
 
 from composio_crewai import Action, App, ComposioToolSet, WorkspaceType
 
-
 # Load environment variables from .env
 dotenv.load_dotenv()
 
+
 class Model(str, Enum):
     OPENAI = "openai"
+
 
 model = Model.OPENAI
 
@@ -50,28 +52,41 @@ class ProblemSolversCrew:
     agents_config: str | dict = "config/agents.yaml"
     tasks_config: str | dict = "config/tasks.yaml"
 
+    tools = [
+        *ComposioToolSet(api_key="jhelsrsn9a8shezjwi0ssc").get_tools(
+            apps=[App.FILETOOL, App.SHELLTOOL, ]
+        ),
+    ]
+
     @agent
     def planner(self) -> Agent:
         return Agent(
             config=self.agents_config["planner"],
             llm=gemini_llm,
+            tools=self.tools,
         )
+
     @agent
     def editor(self) -> Agent:
         return Agent(
             config=self.agents_config["editor"],
             llm=gemini_llm,
+            tools=self.tools,
         )
+
     @task
     def planner_task(self) -> Task:
         return Task(
             config=self.tasks_config["planner_task"],
         )
+
     @task
     def editor_task(self) -> Task:
         return Task(
             config=self.tasks_config["editor_task"],
         )
+
+    @crew
     def crew(self) -> Crew:
         return Crew(
             agents=[self.planner(), self.editor()],
@@ -80,8 +95,8 @@ class ProblemSolversCrew:
             verbose=True
         )
 
-def get_crew(workspace_id: str):
 
+def get_crew(workspace_id: str):
     composio_toolset = ComposioToolSet(
         # workspace_config=WorkspaceType.Docker(),
     )
@@ -143,6 +158,22 @@ def get_crew(workspace_id: str):
 
 
 if __name__ == '__main__':
+    from pathlib import Path
+    # from inputs import from_github; repo, issue = from_github() # for cli tests
+    owner, repo, value = "ElGreKost", "SoftwareDeveloperAgents", "1"
+    composio_tool_set = ComposioToolSet()
+    issue = composio_tool_set.execute_action(
+        action=Action.GITHUB_GET_AN_ISSUE,
+        params=dict(owner=owner, repo=repo, issue_number=int(value)),
+    ).get("data", {}).get("body", None)
+
+    composio_tests_workdir = Path(Path.home(), "composio_tests")
+    os.makedirs(composio_tests_workdir, exist_ok=True)
+
+    composio_tool_set.execute_action(
+        action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
+        params={"path": str(composio_tests_workdir)},
+    )
     crew = ProblemSolversCrew().crew()
-    crew_output = crew.kickoff()
+    crew_output = crew.kickoff(inputs=dict(repo=owner+"/"+repo, issue=issue))
     print(crew_output)

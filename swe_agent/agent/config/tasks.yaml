@@ -2,12 +2,8 @@ planner_task:
     description: |
       We're currently solving the following issue within our repository. 
       Here's the issue text:
-        ISSUE: issue
-        REPO: repo
-        NOTE: The problematic file is seaborn/_stats/regression.py
-
-        NOTE: The problematic file is seaborn/seaborn/_stats/regression.py first\ make sure that it exists with git 
-      repo tree tool 
+        ISSUE: {issue}
+        REPO: {repo}
 
         STEPS:
         1. Understand the GitHub Issue:
@@ -37,8 +33,8 @@ editor_task:
     description: |
       We're currently solving the following issue within our repository. 
       Here's the issue text:
-        ISSUE: issue
-        REPO: repo
+        ISSUE: {issue}
+        REPO: {repo}
 
       Now, you're going to edit the code on your own, as instructed by the planner. 
       When you've made all the necessary edits, you can return the patch to the planner. Note 

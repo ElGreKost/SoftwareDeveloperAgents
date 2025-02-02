@@ -1,0 +1,25 @@
+select_nature_and_animals:
+  description: "Select a specific part of nature (e.g., forest, ocean) and three animal types."
+  expected_output: |
+    Output should include:
+      1. Part of nature (e.g., a forest, desert, ocean).
+      2. Names of three types of animals related to the selected nature.
+  agent: writer
+
+plan_story_structure:
+  description: "Create the beginning, middle, and end structure for the story."
+  expected_output: |
+    Output should include:
+      1. A brief description of the beginning of the story.
+      2. A brief description of the middle of the story.
+      3. A brief description of the end of the story.
+  agent: writer
+
+write_story:
+  description: "Write three paragraphs: one for the beginning, one for the middle, and one for the end."
+  expected_output: |
+    Output should include:
+      1. First paragraph: Setting up the story based on the beginning description.
+      2. Second paragraph: Expanding the story in the middle.
+      3. Third paragraph: Concluding the story with the end structure.
+  agent: writer
