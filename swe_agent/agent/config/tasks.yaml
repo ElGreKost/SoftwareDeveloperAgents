@@ -2,8 +2,8 @@ planner_task:
     description: |
       We're currently solving the following issue within our repository. 
       Here's the issue text:
-        ISSUE: {issue}
-        REPO: {repo}
+        ISSUE: issue
+        REPO: repo
         NOTE: The problematic file is seaborn/_stats/regression.py
 
         NOTE: The problematic file is seaborn/seaborn/_stats/regression.py first\ make sure that it exists with git 
@@ -31,14 +31,14 @@ planner_task:
       Your response should contain only one of the following actions:
       "EDIT FILE", "PATCH COMPLETED",
       along with a short instruction on what to do next in txt format.
-    agent: planner_agent
+    agent: planner
 
 editor_task:
     description: |
       We're currently solving the following issue within our repository. 
       Here's the issue text:
-        ISSUE: {issue}
-        REPO: {repo}
+        ISSUE: issue
+        REPO: repo
 
       Now, you're going to edit the code on your own, as instructed by the planner. 
       When you've made all the necessary edits, you can return the patch to the planner. Note 
@@ -46,4 +46,4 @@ editor_task:
       environment, nor write and run python scripts.
     expected_output:
       A patch should be generated which fixes the given issue and a PR should be created
-    agent: editor_agent
+    agent: editor

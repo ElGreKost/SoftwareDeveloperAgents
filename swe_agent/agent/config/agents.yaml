@@ -1,5 +1,4 @@
-
-planner_agent:
+planner:
     role: Planner
     goal: Fix the coding issues given by the user and guide the Code Editor agent
     backstory: |
@@ -78,7 +77,7 @@ planner_agent:
 
     verbose: true
 
-editor_agent:
+editor:
     role: Code Editor
     goal: >
       Make the necessary changes to the code to solve the issue submitted by

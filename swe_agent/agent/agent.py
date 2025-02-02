@@ -2,7 +2,6 @@
 
 import os
 from enum import Enum
-from crewai import LLM
 import dotenv
 import typing as t
 from crewai import Agent, Crew, Process, Task, LLM
@@ -54,19 +53,19 @@ class ProblemSolversCrew:
     @agent
     def planner(self) -> Agent:
         return Agent(
-            config=self.agents_config["planner_agent"],
+            config=self.agents_config["planner"],
             llm=gemini_llm,
         )
     @agent
     def editor(self) -> Agent:
         return Agent(
-            config=self.agents_config["coder_agent"],
+            config=self.agents_config["editor"],
             llm=gemini_llm,
         )
     @task
     def planner_task(self) -> Task:
         return Task(
-            config=self.tasks_config["editor_task"],
+            config=self.tasks_config["planner_task"],
         )
     @task
     def editor_task(self) -> Task:
@@ -75,8 +74,8 @@ class ProblemSolversCrew:
         )
     def crew(self) -> Crew:
         return Crew(
-            agents=[self.planner, self.editor],
-            tasks=[self.planner_task, self.editor_task],
+            agents=[self.planner(), self.editor()],
+            tasks=[self.planner_task(), self.editor_task()],
             process=Process.sequential,
             verbose=True
         )
@@ -141,3 +140,9 @@ def get_crew(workspace_id: str):
         memory=True,
     )
     return crew, composio_toolset
+
+
+if __name__ == '__main__':
+    crew = ProblemSolversCrew().crew()
+    crew_output = crew.kickoff()
+    print(crew_output)
