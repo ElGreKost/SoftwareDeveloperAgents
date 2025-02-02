@@ -13,6 +13,13 @@ gemini_llm = LLM(
     api_key=GEMINI_API_KEY,
     temperature=0,
 )
+# to get the api base link, you have to activate the inference endpoint from
+# https://endpoints.huggingface.co/kkakkavas/endpoints/swe-llama-7b-ugn
+swe_llm = LLM(
+    model="huggingface/princeton-nlp/SWE-Llama-7b",
+    max_tokens=100,
+    api_base="https://a2w1zm7lm6u7def9.us-east-1.aws.endpoints.huggingface.cloud",
+)
 from langchain_openai import ChatOpenAI
 from langchain_aws import ChatBedrock
 from prompts import PLANNER_BACKSTORY, PLANNER_DESCRIPTION, PLANNER_EXPECTED_OUTPUT, PLANNER_GOAL, PLANNER_ROLE
