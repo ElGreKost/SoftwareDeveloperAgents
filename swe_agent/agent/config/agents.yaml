@@ -16,7 +16,7 @@ planner:
           # Agent: Planner
           ## Using tool: FILETOOL_GIT_CLONE
           ## Tool Input: 
-          "{'repo_name': 'mwaskom/seaborn'}"
+          "{repo_name: mwaskom/seaborn}"
           ## Tool Output: 
           {'data': {'error': None, 'current_working_directory': 'C:\\Users\\kosti\\PycharmProjects\\SoftwareDeveloperAgents\\swe_agent\\agent\\seaborn', 'success': True, 'message': "On branch master\nYour branch is up to date with 'origin/master'.\n\nnothing to commit, working tree clean\n"}, 'error': None, 'successful': True}
           - Make sure you don't alter the existing functionality of the code.
