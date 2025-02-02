@@ -1,5 +1,6 @@
 """CrewAI SWE Agent"""
 
+from pathlib import Path
 import os
 from enum import Enum
 import dotenv
@@ -9,7 +10,7 @@ from crewai.project import agent, task, CrewBase, crew
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_llm = LLM(
-    model="gemini/gemini-2.0-flash-exp",
+    model="gemini/gemini-1.5-flash-8b",
     api_key=GEMINI_API_KEY,
     temperature=0,
 )
@@ -52,11 +53,14 @@ class ProblemSolversCrew:
     agents_config: str | dict = "config/agents.yaml"
     tasks_config: str | dict = "config/tasks.yaml"
 
-    tools = [
-        *ComposioToolSet(api_key="jhelsrsn9a8shezjwi0ssc").get_tools(
-            apps=[App.FILETOOL, App.SHELLTOOL, ]
-        ),
-    ]
+    toolset = ComposioToolSet(api_key="jhelsrsn9a8shezjwi0ssc")
+    projects_root = Path(Path.home() / "repos")
+    os.makedirs(projects_root, exist_ok=True)
+    toolset.execute_action(
+        action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
+        params={"path": str(projects_root)},
+    )
+    tools = [*toolset.get_tools(apps=[App.FILETOOL, App.SHELLTOOL])]
 
     @agent
     def planner(self) -> Agent:
