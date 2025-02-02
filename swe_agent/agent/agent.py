@@ -10,7 +10,7 @@ from crewai.project import agent, task, CrewBase, crew
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_llm = LLM(
-    model="gemini/gemini-2.0-flash-exp",
+    model="gemini/gemini-1.5-flash-8b",
     api_key=GEMINI_API_KEY,
     temperature=0,
 )
