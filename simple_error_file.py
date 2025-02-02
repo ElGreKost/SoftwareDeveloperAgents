@@ -1,5 +1,5 @@
 def gcd(a, b):
-    b = 4 # POSSIBLE BUG
+
     while b != 0:
         a, b = b, a % b
     return a
