@@ -163,21 +163,58 @@ def get_crew(workspace_id: str):
 
 if __name__ == '__main__':
     from pathlib import Path
+    from datasets import load_dataset
+    swe_bench_test_dataset = load_dataset("princeton-nlp/SWE-bench", split="test")
+
     # from inputs import from_github; repo, issue = from_github() # for cli tests
-    owner, repo, value = "ElGreKost", "SoftwareDeveloperAgents", "1"
+    def extract_owner_repo_issue_num(instance_id):
+        owner__repo, issue_num = instance_id.split("-")
+        return owner__repo.split("__")[0], owner__repo.split("__")[1], issue_num
+    for row in swe_bench_test_dataset:
+        print(extract_owner_repo_issue_num(row["instance_id"]), row["base_commit"])
+        owner, repo, issue_num = extract_owner_repo_issue_num(row["instance_id"])
+        break
+    # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
     composio_tool_set = ComposioToolSet()
+    print("getting issue")
     issue = composio_tool_set.execute_action(
         action=Action.GITHUB_GET_AN_ISSUE,
-        params=dict(owner=owner, repo=repo, issue_number=int(value)),
+        params=dict(owner=owner, repo=repo, issue_number=int(issue_num)),
     ).get("data", {}).get("body", None)
 
-    composio_tests_workdir = Path(Path.home(), "composio_tests")
-    os.makedirs(composio_tests_workdir, exist_ok=True)
+    faulty_repos_dir = Path(Path.home(), "faulty_repos")
+    os.makedirs(faulty_repos_dir, exist_ok=True)
 
+    print("changing dir")
     composio_tool_set.execute_action(
         action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
-        params={"path": str(composio_tests_workdir)},
+        params={"path": str(faulty_repos_dir)},
     )
-    crew = ProblemSolversCrew().crew()
-    crew_output = crew.kickoff(inputs=dict(repo=owner+"/"+repo, issue=issue))
-    print(crew_output)
+
+    print("cloning")
+    # clone the repo in the faulty_repos_dir
+    composio_tool_set.execute_action(
+        action=Action.FILETOOL_GIT_CLONE,
+        params={"repo_name": f"{owner}/{repo}"},
+    )
+
+
+    print("changing dir")
+    composio_tool_set.execute_action(
+        action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
+        params={"path": str(faulty_repos_dir / repo)},
+    )
+
+    def get_commit_hash(owner, repo, issue_num):
+        return swe_bench_test_dataset.filter(lambda x: x['instance_id'] == f"{owner}__{repo}-{issue_num}")["base_commit"][0]
+
+
+    print("checkout")
+    # get the error commit as the current codebase
+    composio_tool_set.execute_action(
+        action=Action.FILETOOL_GIT_CUSTOM,
+        params={"cmd": f"checkout {get_commit_hash(owner, repo, issue_num)}^"},
+    )
+    # crew = ProblemSolversCrew().crew()
+    # crew_output = crew.kickoff(inputs=dict(repo=owner+"/"+repo, issue=issue))
+    # print(crew_output)
