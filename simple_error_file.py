@@ -5,8 +5,7 @@ def gcd(a, b):
     return a
 
 if __name__ == '__main__':
-    # Παράδειγμα χρήσης
     num1 = 56
     num2 = 98
     result = gcd(num1, num2)
-    print(f"Το ΜΚΔ των {num1} και {num2} είναι {result}.")
+    print(f"GCD OF {num1} and {num2} is {result}.")
