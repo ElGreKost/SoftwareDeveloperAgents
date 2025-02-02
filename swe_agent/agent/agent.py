@@ -1,15 +1,13 @@
 """CrewAI SWE Agent"""
-
 import os
 from enum import Enum
 import dotenv
-import typing as t
 from crewai import Agent, Crew, Process, Task, LLM
-from crewai.project import agent, task, CrewBase, crew
+from crewai.project import agent, task, CrewBase, crew, before_kickoff
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_llm = LLM(
-    model="gemini/gemini-2.0-flash-exp",
+    model="gemini/gemini-1.5-flash-8b",
     api_key=GEMINI_API_KEY,
     temperature=0,
 )
@@ -21,7 +19,6 @@ swe_llm = LLM(
     api_base="https://a2w1zm7lm6u7def9.us-east-1.aws.endpoints.huggingface.cloud",
 )
 from langchain_openai import ChatOpenAI
-from langchain_aws import ChatBedrock
 from prompts import PLANNER_BACKSTORY, PLANNER_DESCRIPTION, PLANNER_EXPECTED_OUTPUT, PLANNER_GOAL, PLANNER_ROLE
 from prompts import EDITOR_BACKSTORY, EDITOR_DESCRIPTION, EDITOR_EXPECTED_OUTPUT, EDITOR_GOAL, EDITOR_ROLE
 
@@ -52,11 +49,18 @@ class ProblemSolversCrew:
     agents_config: str | dict = "config/agents.yaml"
     tasks_config: str | dict = "config/tasks.yaml"
 
-    tools = [
-        *ComposioToolSet(api_key="jhelsrsn9a8shezjwi0ssc").get_tools(
-            apps=[App.FILETOOL, App.SHELLTOOL, ]
-        ),
-    ]
+    composio_toolset = ComposioToolSet()
+    tools = [*composio_toolset.get_tools(apps=[App.FILETOOL, App.SHELLTOOL])]
+
+
+    @before_kickoff
+    def prepare_inputs(self, inputs):
+        problem_solvers_dir = Path(Path.home(), "dev").resolve()
+        os.makedirs(problem_solvers_dir, exist_ok=True)
+        self.composio_toolset.execute_action(
+            action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
+            params={"path": str(problem_solvers_dir)},
+        )
 
     @agent
     def planner(self) -> Agent:
@@ -159,10 +163,11 @@ def get_crew(workspace_id: str):
 
 if __name__ == '__main__':
     from pathlib import Path
+
     # from inputs import from_github; repo, issue = from_github() # for cli tests
-    owner, repo, value = "ElGreKost", "SoftwareDeveloperAgents", "1"
-    composio_tool_set = ComposioToolSet()
-    issue = composio_tool_set.execute_action(
+    # owner, repo, value = "ElGreKost", "SoftwareDeveloperAgents", "1"
+    owner, repo, _, value = "mwaskom/seaborn/issues/2992".split('/')
+    issue = ComposioToolSet().execute_action(
         action=Action.GITHUB_GET_AN_ISSUE,
         params=dict(owner=owner, repo=repo, issue_number=int(value)),
     ).get("data", {}).get("body", None)
@@ -175,5 +180,5 @@ if __name__ == '__main__':
         params={"path": str(composio_tests_workdir)},
     )
     crew = ProblemSolversCrew().crew()
-    crew_output = crew.kickoff(inputs=dict(repo=owner+"/"+repo, issue=issue))
+    crew_output = crew.kickoff(inputs=dict(repo=owner + "/" + repo, issue=issue))
     print(crew_output)
