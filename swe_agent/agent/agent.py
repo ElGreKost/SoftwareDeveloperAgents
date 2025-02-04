@@ -108,7 +108,8 @@ if __name__ == '__main__':
     for row in swe_bench_test_dataset:
         print(extract_owner_repo_issue_num(row["instance_id"]), row["base_commit"])
         owner, repo, issue_num = extract_owner_repo_issue_num(row["instance_id"])
-        break
+        if owner == 'django' and issue_num == '': # 10914, 12708, 14382, 13230
+            break
     # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
     composio_tool_set = ComposioToolSet()
     print("getting issue")
@@ -117,7 +118,7 @@ if __name__ == '__main__':
         params=dict(owner=owner, repo=repo, issue_number=int(issue_num)),
     ).get("data", {}).get("body", None)
 
-    faulty_repos_dir = Path(Path.home(), "faulty_repos")
+    faulty_repos_dir = Path(Path.home(), "repos")
     os.makedirs(faulty_repos_dir, exist_ok=True)
 
     print("changing dir")
@@ -150,6 +151,10 @@ if __name__ == '__main__':
         action=Action.FILETOOL_GIT_CUSTOM,
         params={"cmd": f"checkout {get_commit_hash(owner, repo, issue_num)}^"},
     )
-    # crew = ProblemSolversCrew().crew()
-    # crew_output = crew.kickoff(inputs=dict(repo=owner+"/"+repo, issue=issue))
-    # print(crew_output)
+    crew = ProblemSolversCrew().crew()
+    crew_output = crew.kickoff(inputs=dict(repo=owner + "/" + repo, issue=issue))
+    print(crew_output)
+
+    #crew = ProblemSolversCrew().crew()
+    #crew_output = crew.kickoff(inputs=dict(repo=owner+"/"+repo, issue=issue))
+    #print(crew_output)
