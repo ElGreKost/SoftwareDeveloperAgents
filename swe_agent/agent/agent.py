@@ -22,9 +22,6 @@ swe_llm = LLM(
     api_base="https://a2w1zm7lm6u7def9.us-east-1.aws.endpoints.huggingface.cloud",
 )
 from langchain_openai import ChatOpenAI
-from langchain_aws import ChatBedrock
-from prompts import PLANNER_BACKSTORY, PLANNER_DESCRIPTION, PLANNER_EXPECTED_OUTPUT, PLANNER_GOAL, PLANNER_ROLE
-from prompts import EDITOR_BACKSTORY, EDITOR_DESCRIPTION, EDITOR_EXPECTED_OUTPUT, EDITOR_GOAL, EDITOR_ROLE
 
 from composio_crewai import Action, App, ComposioToolSet, WorkspaceType
 
@@ -98,68 +95,6 @@ class ProblemSolversCrew:
             process=Process.sequential,
             verbose=True
         )
-
-
-def get_crew(workspace_id: str):
-    composio_toolset = ComposioToolSet(
-        # workspace_config=WorkspaceType.Docker(),
-    )
-    if workspace_id:
-        composio_toolset.set_workspace_id(workspace_id)
-
-    # Get required tools
-    tools = [
-        *composio_toolset.get_tools(
-            apps=[
-                App.FILETOOL,
-                App.SHELLTOOL,
-                # App.CODE_ANALYSIS_TOOL,
-            ]
-        ),
-    ]
-
-    # Define agent
-    # Define agent
-    planner = Agent(
-        role=PLANNER_ROLE,
-        goal=PLANNER_GOAL,
-        backstory=PLANNER_BACKSTORY,
-        llm=gemini_llm,
-        tools=tools,
-        verbose=True,
-    )
-
-    editor = Agent(
-        role=EDITOR_ROLE,
-        goal=EDITOR_GOAL,
-        backstory=EDITOR_BACKSTORY,
-        llm=gemini_llm,
-        tools=tools,
-        verbose=True,
-    )
-
-    planner_task = Task(
-        description=PLANNER_DESCRIPTION,
-        expected_output=PLANNER_EXPECTED_OUTPUT,
-        agent=planner,
-    )
-
-    editor_task = Task(
-        description=EDITOR_DESCRIPTION,
-        expected_output=EDITOR_EXPECTED_OUTPUT,
-        agent=editor,
-    )
-
-    crew = Crew(
-        agents=[planner, editor],
-        tasks=[planner_task, editor_task],
-        process=Process.sequential,
-        verbose=True,
-        cache=False,
-        memory=True,
-    )
-    return crew, composio_toolset
-
 
 if __name__ == '__main__':
     from pathlib import Path
