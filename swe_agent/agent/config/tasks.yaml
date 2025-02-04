@@ -8,10 +8,32 @@ planner_task:
         STEPS:
         1. Understand the GitHub Issue:
         2. See all the files in the current directory with FILETOOL_LIST_FILES action:
-        3. Clone the repo
+        3. Clone the repo DELETE
         4. See all the files in the current directory now with the git repo in the file system and create a plan to solve the issue.
         5. Open the files you think should be examined and read the code. 
         6. if you think you have enough information call EDIT FILE so that the Editor can edit the code.
+      
+      Your current working directory is inside the repo.
+      
+      The codebase under your current working directory is: 
+      
+      .
+      ├── patches.txt
+      ├── _pg.ipynb
+      ├── README.md
+      ├── simple_error_file.py
+      ├── swe_agent
+      │   └── agent
+      │       ├── agent.py
+      │       ├── benchmark.py
+      │       ├── config
+      │       │   ├── agents.yaml
+      │       │   └── tasks.yaml
+      │       ├── __init__.py
+      │       ├── main.py
+      │       └── tools.py
+      └── swe_dataset_simple.json
+
 
       Now, you're going solve the issue and guide a Code Editor to make changes to the code until you're 
       satisfied with all of the changes he's made. Then you can submit these changes to the code base by 

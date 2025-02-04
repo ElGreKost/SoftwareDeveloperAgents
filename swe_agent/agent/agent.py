@@ -105,9 +105,11 @@ if __name__ == '__main__':
     def extract_owner_repo_issue_num(instance_id):
         owner__repo, issue_num = instance_id.split("-")
         return owner__repo.split("__")[0], owner__repo.split("__")[1], issue_num
-    for row in swe_bench_test_dataset:
-        print(extract_owner_repo_issue_num(row["instance_id"]), row["base_commit"])
-        owner, repo, issue_num = extract_owner_repo_issue_num(row["instance_id"])
+    for issue_data in swe_bench_test_dataset:
+        import re
+        gold_file_path = re.findall(r"(?<=diff --git a)\S+", issue_data["patch"])[0]
+        print(extract_owner_repo_issue_num(issue_data["instance_id"]), issue_data["base_commit"], gold_file_path, issue_data["hints_text"])
+        owner, repo, issue_num = extract_owner_repo_issue_num(issue_data["instance_id"])
         if owner == 'django' and issue_num == '': # 10914, 12708, 14382, 13230
             break
     # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
@@ -140,6 +142,17 @@ if __name__ == '__main__':
         action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
         params={"path": str(faulty_repos_dir / repo)},
     )
+
+    print("getting git repo tree")
+    composio_tool_set.execute_action(
+        action=Action.FILETOOL_GIT_REPO_TREE,
+        params={},
+    )
+
+    print("extracting it manually")
+    import os
+    repo_listdir = os.listdir(str(faulty_repos_dir / repo))
+
 
     def get_commit_hash(owner, repo, issue_num):
         return swe_bench_test_dataset.filter(lambda x: x['instance_id'] == f"{owner}__{repo}-{issue_num}")["base_commit"][0]

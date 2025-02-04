@@ -1,0 +1,1485 @@
+diff --git a/seaborn/_oldcore.py b/seaborn/_oldcore.py
+--- a/seaborn/_oldcore.py
++++ b/seaborn/_oldcore.py
+@@ -149,6 +149,13 @@ def _lookup_single(self, key):
+             # Use a value that's in the original data vector
+             value = self.lookup_table[key]
+         except KeyError:
++
++            if self.norm is None:
++                # Currently we only get here in scatterplot with hue_order,
++                # because scatterplot does not consider hue a grouping variable
++                # So unused hue levels are in the data, but not the lookup table
++                return (0, 0, 0, 0)
++
+             # Use the colormap to interpolate between existing datapoints
+             # (e.g. in the context of making a continuous legend)
+             try:
+
+
+==============
+
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -38,7 +38,10 @@ def _fit_predict(self, data):
+
+     def __call__(self, data, groupby, orient, scales):
+
+-        return groupby.apply(data, self._fit_predict)
++        return (
++            groupby
++            .apply(data.dropna(subset=["x", "y"]), self._fit_predict)
++        )
+
+
+ @dataclass
+
+
+==============
+
+diff --git a/seaborn/_core/scales.py b/seaborn/_core/scales.py
+--- a/seaborn/_core/scales.py
++++ b/seaborn/_core/scales.py
+@@ -346,7 +346,7 @@ def _setup(
+                 vmin, vmax = data.min(), data.max()
+             else:
+                 vmin, vmax = new.norm
+-            vmin, vmax = axis.convert_units((vmin, vmax))
++            vmin, vmax = map(float, axis.convert_units((vmin, vmax)))
+             a = forward(vmin)
+             b = forward(vmax) - forward(vmin)
+
+
+
+==============
+
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1472,8 +1472,8 @@ def map_diag(self, func, **kwargs):
+                 for ax in diag_axes[1:]:
+                     share_axis(diag_axes[0], ax, "y")
+
+-            self.diag_vars = np.array(diag_vars, np.object_)
+-            self.diag_axes = np.array(diag_axes, np.object_)
++            self.diag_vars = diag_vars
++            self.diag_axes = diag_axes
+
+         if "hue" not in signature(func).parameters:
+             return self._map_diag_iter_hue(func, **kwargs)
+
+
+==============
+
+diff --git a/src/flask/blueprints.py b/src/flask/blueprints.py
+--- a/src/flask/blueprints.py
++++ b/src/flask/blueprints.py
+@@ -188,6 +188,10 @@ def __init__(
+             template_folder=template_folder,
+             root_path=root_path,
+         )
++
++        if "." in name:
++            raise ValueError("'name' may not contain a dot '.' character.")
++
+         self.name = name
+         self.url_prefix = url_prefix
+         self.subdomain = subdomain
+@@ -360,12 +364,12 @@ def add_url_rule(
+         """Like :meth:`Flask.add_url_rule` but for a blueprint.  The endpoint for
+         the :func:`url_for` function is prefixed with the name of the blueprint.
+         """
+-        if endpoint:
+-            assert "." not in endpoint, "Blueprint endpoints should not contain dots"
+-        if view_func and hasattr(view_func, "__name__"):
+-            assert (
+-                "." not in view_func.__name__
+-            ), "Blueprint view function name should not contain dots"
++        if endpoint and "." in endpoint:
++            raise ValueError("'endpoint' may not contain a dot '.' character.")
++
++        if view_func and hasattr(view_func, "__name__") and "." in view_func.__name__:
++            raise ValueError("'view_func' name may not contain a dot '.' character.")
++
+         self.record(lambda s: s.add_url_rule(rule, endpoint, view_func, **options))
+
+     def app_template_filter(self, name: t.Optional[str] = None) -> t.Callable:
+
+
+==============
+
+diff --git a/src/flask/config.py b/src/flask/config.py
+--- a/src/flask/config.py
++++ b/src/flask/config.py
+@@ -234,6 +234,7 @@ def from_file(
+         filename: str,
+         load: t.Callable[[t.IO[t.Any]], t.Mapping],
+         silent: bool = False,
++        text: bool = True,
+     ) -> bool:
+         """Update the values in the config from a file that is loaded
+         using the ``load`` parameter. The loaded data is passed to the
+@@ -244,8 +245,8 @@ def from_file(
+             import json
+             app.config.from_file("config.json", load=json.load)
+
+-            import toml
+-            app.config.from_file("config.toml", load=toml.load)
++            import tomllib
++            app.config.from_file("config.toml", load=tomllib.load, text=False)
+
+         :param filename: The path to the data file. This can be an
+             absolute path or relative to the config root path.
+@@ -254,14 +255,18 @@ def from_file(
+         :type load: ``Callable[[Reader], Mapping]`` where ``Reader``
+             implements a ``read`` method.
+         :param silent: Ignore the file if it doesn't exist.
++        :param text: Open the file in text or binary mode.
+         :return: ``True`` if the file was loaded successfully.
+
++        .. versionchanged:: 2.3
++            The ``text`` parameter was added.
++
+         .. versionadded:: 2.0
+         """
+         filename = os.path.join(self.root_path, filename)
+
+         try:
+-            with open(filename) as f:
++            with open(filename, "r" if text else "rb") as f:
+                 obj = load(f)
+         except OSError as e:
+             if silent and e.errno in (errno.ENOENT, errno.EISDIR):
+
+
+==============
+
+diff --git a/src/flask/cli.py b/src/flask/cli.py
+--- a/src/flask/cli.py
++++ b/src/flask/cli.py
+@@ -9,7 +9,7 @@
+ import traceback
+ import typing as t
+ from functools import update_wrapper
+-from operator import attrgetter
++from operator import itemgetter
+
+ import click
+ from click.core import ParameterSource
+@@ -989,49 +989,62 @@ def shell_command() -> None:
+ @click.option(
+     "--sort",
+     "-s",
+-    type=click.Choice(("endpoint", "methods", "rule", "match")),
++    type=click.Choice(("endpoint", "methods", "domain", "rule", "match")),
+     default="endpoint",
+     help=(
+-        'Method to sort routes by. "match" is the order that Flask will match '
+-        "routes when dispatching a request."
++        "Method to sort routes by. 'match' is the order that Flask will match routes"
++        " when dispatching a request."
+     ),
+ )
+ @click.option("--all-methods", is_flag=True, help="Show HEAD and OPTIONS methods.")
+ @with_appcontext
+ def routes_command(sort: str, all_methods: bool) -> None:
+     """Show all registered routes with endpoints and methods."""
+-
+     rules = list(current_app.url_map.iter_rules())
++
+     if not rules:
+         click.echo("No routes were registered.")
+         return
+
+-    ignored_methods = set(() if all_methods else ("HEAD", "OPTIONS"))
++    ignored_methods = set() if all_methods else {"HEAD", "OPTIONS"}
++    host_matching = current_app.url_map.host_matching
++    has_domain = any(rule.host if host_matching else rule.subdomain for rule in rules)
++    rows = []
+
+-    if sort in ("endpoint", "rule"):
+-        rules = sorted(rules, key=attrgetter(sort))
+-    elif sort == "methods":
+-        rules = sorted(rules, key=lambda rule: sorted(rule.methods))  # type: ignore
++    for rule in rules:
++        row = [
++            rule.endpoint,
++            ", ".join(sorted((rule.methods or set()) - ignored_methods)),
++        ]
+
+-    rule_methods = [
+-        ", ".join(sorted(rule.methods - ignored_methods))  # type: ignore
+-        for rule in rules
+-    ]
++        if has_domain:
++            row.append((rule.host if host_matching else rule.subdomain) or "")
+
+-    headers = ("Endpoint", "Methods", "Rule")
+-    widths = (
+-        max(len(rule.endpoint) for rule in rules),
+-        max(len(methods) for methods in rule_methods),
+-        max(len(rule.rule) for rule in rules),
+-    )
+-    widths = [max(len(h), w) for h, w in zip(headers, widths)]
+-    row = "{{0:<{0}}}  {{1:<{1}}}  {{2:<{2}}}".format(*widths)
++        row.append(rule.rule)
++        rows.append(row)
++
++    headers = ["Endpoint", "Methods"]
++    sorts = ["endpoint", "methods"]
++
++    if has_domain:
++        headers.append("Host" if host_matching else "Subdomain")
++        sorts.append("domain")
++
++    headers.append("Rule")
++    sorts.append("rule")
++
++    try:
++        rows.sort(key=itemgetter(sorts.index(sort)))
++    except ValueError:
++        pass
+
+-    click.echo(row.format(*headers).strip())
+-    click.echo(row.format(*("-" * width for width in widths)))
++    rows.insert(0, headers)
++    widths = [max(len(row[i]) for row in rows) for i in range(len(headers))]
++    rows.insert(1, ["-" * w for w in widths])
++    template = "  ".join(f"{{{i}:<{w}}}" for i, w in enumerate(widths))
+
+-    for rule, methods in zip(rules, rule_methods):
+-        click.echo(row.format(rule.endpoint, methods, rule.rule).rstrip())
++    for row in rows:
++        click.echo(template.format(*row))
+
+
+ cli = FlaskGroup(
+
+
+==============
+
+diff --git a/requests/sessions.py b/requests/sessions.py
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -168,8 +168,11 @@ def resolve_redirects(self, resp, req, stream=False, timeout=None,
+             if new_auth is not None:
+                 prepared_request.prepare_auth(new_auth)
+
++            # Override the original request.
++            req = prepared_request
++
+             resp = self.send(
+-                prepared_request,
++                req,
+                 stream=stream,
+                 timeout=timeout,
+                 verify=verify,
+
+
+==============
+
+diff --git a/requests/sessions.py b/requests/sessions.py
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -13,7 +13,7 @@
+ from datetime import datetime
+
+ from .auth import _basic_auth_str
+-from .compat import cookielib, OrderedDict, urljoin, urlparse, builtin_str
++from .compat import cookielib, OrderedDict, urljoin, urlparse
+ from .cookies import (
+     cookiejar_from_dict, extract_cookies_to_jar, RequestsCookieJar, merge_cookies)
+ from .models import Request, PreparedRequest, DEFAULT_REDIRECT_LIMIT
+@@ -425,7 +425,7 @@ def request(self, method, url,
+             If Tuple, ('cert', 'key') pair.
+         """
+
+-        method = builtin_str(method)
++        method = to_native_string(method)
+
+         # Create the Request.
+         req = Request(
+
+
+==============
+
+diff --git a/requests/adapters.py b/requests/adapters.py
+--- a/requests/adapters.py
++++ b/requests/adapters.py
+@@ -19,6 +19,7 @@
+ from .utils import (DEFAULT_CA_BUNDLE_PATH, get_encoding_from_headers,
+                     prepend_scheme_if_needed, get_auth_from_url, urldefragauth)
+ from .structures import CaseInsensitiveDict
++from .packages.urllib3.exceptions import ClosedPoolError
+ from .packages.urllib3.exceptions import ConnectTimeoutError
+ from .packages.urllib3.exceptions import HTTPError as _HTTPError
+ from .packages.urllib3.exceptions import MaxRetryError
+@@ -421,6 +422,9 @@ def send(self, request, stream=False, timeout=None, verify=True, cert=None, prox
+
+             raise ConnectionError(e, request=request)
+
++        except ClosedPoolError as e:
++            raise ConnectionError(e, request=request)
++
+         except _ProxyError as e:
+             raise ProxyError(e)
+
+
+
+==============
+
+diff --git a/requests/utils.py b/requests/utils.py
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -358,13 +358,20 @@ def get_encoding_from_headers(headers):
+
+ def stream_decode_response_unicode(iterator, r):
+     """Stream decodes a iterator."""
++    encoding = r.encoding
+
+-    if r.encoding is None:
+-        for item in iterator:
+-            yield item
+-        return
++    if encoding is None:
++        encoding = r.apparent_encoding
++
++    try:
++        decoder = codecs.getincrementaldecoder(encoding)(errors='replace')
++    except (LookupError, TypeError):
++        # A LookupError is raised if the encoding was not found which could
++        # indicate a misspelling or similar mistake.
++        #
++        # A TypeError can be raised if encoding is None
++        raise UnicodeError("Unable to decode contents with encoding %s." % encoding)
+
+-    decoder = codecs.getincrementaldecoder(r.encoding)(errors='replace')
+     for chunk in iterator:
+         rv = decoder.decode(chunk)
+         if rv:
+
+
+==============
+
+diff --git a/requests/models.py b/requests/models.py
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -462,8 +462,10 @@ def path_url(self):
+
+     def register_hook(self, event, hook):
+         """Properly register a hook."""
+-
+-        self.hooks[event].append(hook)
++        if isinstance(hook, (list, tuple, set)):
++            self.hooks[event].extend(hook)
++        else:
++            self.hooks[event].append(hook)
+
+     def deregister_hook(self, event, hook):
+         """Deregister a previously registered hook.
+
+
+==============
+
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -312,15 +312,9 @@ def _dataset_concat(
+         to_merge = {var: [] for var in variables_to_merge}
+
+         for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
+-
+             for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++                if var in ds:
++                    to_merge[var].append(ds.variables[var])
+
+         for var in variables_to_merge:
+             result_vars[var] = unique_variable(
+
+
+==============
+
+diff --git a/xarray/core/formatting.py b/xarray/core/formatting.py
+--- a/xarray/core/formatting.py
++++ b/xarray/core/formatting.py
+@@ -261,6 +261,8 @@ def inline_variable_array_repr(var, max_width):
+         return inline_dask_repr(var.data)
+     elif isinstance(var._data, sparse_array_type):
+         return inline_sparse_repr(var.data)
++    elif hasattr(var._data, "_repr_inline_"):
++        return var._data._repr_inline_(max_width)
+     elif hasattr(var._data, "__array_function__"):
+         return maybe_truncate(repr(var._data).replace("\n", " "), max_width)
+     else:
+
+
+==============
+
+diff --git a/xarray/core/groupby.py b/xarray/core/groupby.py
+--- a/xarray/core/groupby.py
++++ b/xarray/core/groupby.py
+@@ -436,7 +436,7 @@ def __iter__(self):
+         return zip(self._unique_coord.values, self._iter_grouped())
+
+     def __repr__(self):
+-        return "{}, grouped over {!r} \n{!r} groups with labels {}.".format(
++        return "{}, grouped over {!r}\n{!r} groups with labels {}.".format(
+             self.__class__.__name__,
+             self._unique_coord.name,
+             self._unique_coord.size,
+
+
+==============
+
+diff --git a/pylint/config/config_initialization.py b/pylint/config/config_initialization.py
+--- a/pylint/config/config_initialization.py
++++ b/pylint/config/config_initialization.py
+@@ -81,8 +81,7 @@ def _config_initialization(
+             unrecognized_options.append(opt[1:])
+     if unrecognized_options:
+         msg = ", ".join(unrecognized_options)
+-        linter.add_message("unrecognized-option", line=0, args=msg)
+-        raise _UnrecognizedOptionError(options=unrecognized_options)
++        linter._arg_parser.error(f"Unrecognized option found: {msg}")
+
+     # Set the current module to configuration as we don't know where
+     # the --load-plugins key is coming from
+
+
+==============
+
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -52,6 +52,7 @@ def _is_ignored_file(
+     ignore_list_re: list[Pattern[str]],
+     ignore_list_paths_re: list[Pattern[str]],
+ ) -> bool:
++    element = os.path.normpath(element)
+     basename = os.path.basename(element)
+     return (
+         basename in ignore_list
+
+
+==============
+
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -82,8 +82,10 @@ def expand_modules(
+             continue
+         module_path = get_python_path(something)
+         additional_search_path = [".", module_path] + path
+-        if os.path.exists(something):
+-            # this is a file or a directory
++        if os.path.isfile(something) or os.path.exists(
++            os.path.join(something, "__init__.py")
++        ):
++            # this is a file or a directory with an explicit __init__.py
+             try:
+                 modname = ".".join(
+                     modutils.modpath_from_file(something, path=additional_search_path)
+@@ -103,9 +105,7 @@ def expand_modules(
+                 )
+                 if filepath is None:
+                     continue
+-            except (ImportError, SyntaxError) as ex:
+-                # The SyntaxError is a Python bug and should be
+-                # removed once we move away from imp.find_module: https://bugs.python.org/issue10588
++            except ImportError as ex:
+                 errors.append({"key": "fatal", "mod": modname, "ex": ex})
+                 continue
+         filepath = os.path.normpath(filepath)
+
+
+==============
+
+diff --git a/pylint/config/argument.py b/pylint/config/argument.py
+--- a/pylint/config/argument.py
++++ b/pylint/config/argument.py
+@@ -99,11 +99,20 @@ def _py_version_transformer(value: str) -> tuple[int, ...]:
+     return version
+
+
++def _regex_transformer(value: str) -> Pattern[str]:
++    """Return `re.compile(value)`."""
++    try:
++        return re.compile(value)
++    except re.error as e:
++        msg = f"Error in provided regular expression: {value} beginning at index {e.pos}: {e.msg}"
++        raise argparse.ArgumentTypeError(msg)
++
++
+ def _regexp_csv_transfomer(value: str) -> Sequence[Pattern[str]]:
+     """Transforms a comma separated list of regular expressions."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(re.compile(pattern))
++        patterns.append(_regex_transformer(pattern))
+     return patterns
+
+
+@@ -130,7 +139,7 @@ def _regexp_paths_csv_transfomer(value: str) -> Sequence[Pattern[str]]:
+     "non_empty_string": _non_empty_string_transformer,
+     "path": _path_transformer,
+     "py_version": _py_version_transformer,
+-    "regexp": re.compile,
++    "regexp": _regex_transformer,
+     "regexp_csv": _regexp_csv_transfomer,
+     "regexp_paths_csv": _regexp_paths_csv_transfomer,
+     "string": pylint_utils._unquote,
+
+
+==============
+
+diff --git a/pylint/reporters/text.py b/pylint/reporters/text.py
+--- a/pylint/reporters/text.py
++++ b/pylint/reporters/text.py
+@@ -175,7 +175,7 @@ def on_set_current_module(self, module: str, filepath: str | None) -> None:
+         self._template = template
+
+         # Check to see if all parameters in the template are attributes of the Message
+-        arguments = re.findall(r"\{(.+?)(:.*)?\}", template)
++        arguments = re.findall(r"\{(\w+?)(:.*)?\}", template)
+         for argument in arguments:
+             if argument[0] not in MESSAGE_FIELDS:
+                 warnings.warn(
+
+
+==============
+
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -676,6 +676,7 @@ def run(self, mod: ast.Module) -> None:
+                 expect_docstring
+                 and isinstance(item, ast.Expr)
+                 and isinstance(item.value, ast.Constant)
++                and isinstance(item.value.value, str)
+             ):
+                 doc = item.value.value
+                 if self.is_rewrite_disabled(doc):
+
+
+==============
+
+diff --git a/src/_pytest/pathlib.py b/src/_pytest/pathlib.py
+--- a/src/_pytest/pathlib.py
++++ b/src/_pytest/pathlib.py
+@@ -523,6 +523,8 @@ def import_path(
+
+     if mode is ImportMode.importlib:
+         module_name = module_name_from_path(path, root)
++        with contextlib.suppress(KeyError):
++            return sys.modules[module_name]
+
+         for meta_importer in sys.meta_path:
+             spec = meta_importer.find_spec(module_name, [str(path.parent)])
+
+
+==============
+
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -964,6 +964,8 @@ def visit_Call_35(self, call):
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        if isinstance(call.func, ast.Name) and call.func.id == "all":
++            return self._visit_all(call)
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -987,6 +989,27 @@ def visit_Call_35(self, call):
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+         return res, outer_expl
+
++    def _visit_all(self, call):
++        """Special rewrite for the builtin all function, see #5062"""
++        if not isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp)):
++            return
++        gen_exp = call.args[0]
++        assertion_module = ast.Module(
++            body=[ast.Assert(test=gen_exp.elt, lineno=1, msg="", col_offset=1)]
++        )
++        AssertionRewriter(module_path=None, config=None).run(assertion_module)
++        for_loop = ast.For(
++            iter=gen_exp.generators[0].iter,
++            target=gen_exp.generators[0].target,
++            body=assertion_module.body,
++            orelse=[],
++        )
++        self.statements.append(for_loop)
++        return (
++            ast.Num(n=1),
++            "",
++        )  # Return an empty expression, all the asserts are in the for_loop
++
+     def visit_Starred(self, starred):
+         # From Python 3.5, a Starred node can appear in a function call
+         res, expl = self.visit(starred.value)
+@@ -997,6 +1020,8 @@ def visit_Call_legacy(self, call):
+         """
+         visit `ast.Call nodes on 3.4 and below`
+         """
++        if isinstance(call.func, ast.Name) and call.func.id == "all":
++            return self._visit_all(call)
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+
+
+==============
+
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -534,13 +534,6 @@ def getrepr(
+         )
+         return fmt.repr_excinfo(self)
+
+-    def __str__(self):
+-        if self._excinfo is None:
+-            return repr(self)
+-        entry = self.traceback[-1]
+-        loc = ReprFileLocation(entry.path, entry.lineno + 1, self.exconly())
+-        return str(loc)
+-
+     def match(self, regexp):
+         """
+         Check whether the regular expression 'regexp' is found in the string
+
+
+==============
+
+diff --git a/src/_pytest/assertion/util.py b/src/_pytest/assertion/util.py
+--- a/src/_pytest/assertion/util.py
++++ b/src/_pytest/assertion/util.py
+@@ -254,17 +254,38 @@ def _compare_eq_iterable(left, right, verbose=0):
+
+
+ def _compare_eq_sequence(left, right, verbose=0):
++    comparing_bytes = isinstance(left, bytes) and isinstance(right, bytes)
+     explanation = []
+     len_left = len(left)
+     len_right = len(right)
+     for i in range(min(len_left, len_right)):
+         if left[i] != right[i]:
++            if comparing_bytes:
++                # when comparing bytes, we want to see their ascii representation
++                # instead of their numeric values (#5260)
++                # using a slice gives us the ascii representation:
++                # >>> s = b'foo'
++                # >>> s[0]
++                # 102
++                # >>> s[0:1]
++                # b'f'
++                left_value = left[i : i + 1]
++                right_value = right[i : i + 1]
++            else:
++                left_value = left[i]
++                right_value = right[i]
++
+             explanation += [
+-                "At index {} diff: {!r} != {!r}".format(i, left[i], right[i])
++                "At index {} diff: {!r} != {!r}".format(i, left_value, right_value)
+             ]
+             break
+-    len_diff = len_left - len_right
+
++    if comparing_bytes:
++        # when comparing bytes, it doesn't help to show the "sides contain one or more items"
++        # longer explanation, so skip it
++        return explanation
++
++    len_diff = len_left - len_right
+     if len_diff:
+         if len_diff > 0:
+             dir_with_more = "Left"
+
+
+==============
+
+diff --git a/src/_pytest/junitxml.py b/src/_pytest/junitxml.py
+--- a/src/_pytest/junitxml.py
++++ b/src/_pytest/junitxml.py
+@@ -10,9 +10,11 @@
+ """
+ import functools
+ import os
++import platform
+ import re
+ import sys
+ import time
++from datetime import datetime
+
+ import py
+
+@@ -666,6 +668,8 @@ def pytest_sessionfinish(self):
+             skipped=self.stats["skipped"],
+             tests=numtests,
+             time="%.3f" % suite_time_delta,
++            timestamp=datetime.fromtimestamp(self.suite_start_time).isoformat(),
++            hostname=platform.node(),
+         )
+         logfile.write(Junit.testsuites([suite_node]).unicode(indent=0))
+         logfile.close()
+
+
+==============
+
+diff --git a/src/_pytest/main.py b/src/_pytest/main.py
+--- a/src/_pytest/main.py
++++ b/src/_pytest/main.py
+@@ -109,6 +109,7 @@ def pytest_addoption(parser):
+     group.addoption(
+         "--collectonly",
+         "--collect-only",
++        "--co",
+         action="store_true",
+         help="only collect tests, don't execute them.",
+     ),
+
+
+==============
+
+diff --git a/src/_pytest/_io/saferepr.py b/src/_pytest/_io/saferepr.py
+--- a/src/_pytest/_io/saferepr.py
++++ b/src/_pytest/_io/saferepr.py
+@@ -20,7 +20,7 @@ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
+     except BaseException as exc:
+         exc_info = "unpresentable exception ({})".format(_try_repr_or_str(exc))
+     return "<[{} raised in repr()] {} object at 0x{:x}>".format(
+-        exc_info, obj.__class__.__name__, id(obj)
++        exc_info, type(obj).__name__, id(obj)
+     )
+
+
+
+
+==============
+
+diff --git a/src/_pytest/nodes.py b/src/_pytest/nodes.py
+--- a/src/_pytest/nodes.py
++++ b/src/_pytest/nodes.py
+@@ -29,6 +29,7 @@
+ from _pytest.mark.structures import MarkDecorator
+ from _pytest.mark.structures import NodeKeywords
+ from _pytest.outcomes import fail
++from _pytest.pathlib import Path
+ from _pytest.store import Store
+
+ if TYPE_CHECKING:
+@@ -361,9 +362,14 @@ def _repr_failure_py(
+         else:
+             truncate_locals = True
+
++        # excinfo.getrepr() formats paths relative to the CWD if `abspath` is False.
++        # It is possible for a fixture/test to change the CWD while this code runs, which
++        # would then result in the user seeing confusing paths in the failure message.
++        # To fix this, if the CWD changed, always display the full absolute path.
++        # It will be better to just always display paths relative to invocation_dir, but
++        # this requires a lot of plumbing (#6428).
+         try:
+-            os.getcwd()
+-            abspath = False
++            abspath = Path(os.getcwd()) != Path(self.config.invocation_dir)
+         except OSError:
+             abspath = True
+
+
+
+==============
+
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -10,25 +10,14 @@
+ from ..outcomes import fail
+ from ..outcomes import TEST_OUTCOME
+ from .structures import Mark
+-from _pytest.config import Config
+ from _pytest.nodes import Item
+-from _pytest.store import StoreKey
+
+
+-evalcache_key = StoreKey[Dict[str, Any]]()
++def compiled_eval(expr: str, d: Dict[str, object]) -> Any:
++    import _pytest._code
+
+-
+-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
+-    evalcache = config._store.setdefault(evalcache_key, default)
+-    try:
+-        return evalcache[expr]
+-    except KeyError:
+-        import _pytest._code
+-
+-        exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
+-        return x
++    exprcode = _pytest._code.compile(expr, mode="eval")
++    return eval(exprcode, d)
+
+
+ class MarkEvaluator:
+@@ -98,7 +87,7 @@ def _istrue(self) -> bool:
+                     self.expr = expr
+                     if isinstance(expr, str):
+                         d = self._getglobals()
+-                        result = cached_eval(self.item.config, expr, d)
++                        result = compiled_eval(expr, d)
+                     else:
+                         if "reason" not in mark.kwargs:
+                             # XXX better be checked at collection time
+
+
+==============
+
+diff --git a/src/_pytest/skipping.py b/src/_pytest/skipping.py
+--- a/src/_pytest/skipping.py
++++ b/src/_pytest/skipping.py
+@@ -291,7 +291,8 @@ def pytest_runtest_makereport(item: Item, call: CallInfo[None]):
+             else:
+                 rep.outcome = "passed"
+                 rep.wasxfail = xfailed.reason
+-    elif (
++
++    if (
+         item._store.get(skipped_by_mark_key, True)
+         and rep.skipped
+         and type(rep.longrepr) is tuple
+
+
+==============
+
+diff --git a/src/_pytest/tmpdir.py b/src/_pytest/tmpdir.py
+--- a/src/_pytest/tmpdir.py
++++ b/src/_pytest/tmpdir.py
+@@ -115,7 +115,12 @@ def getbasetemp(self) -> Path:
+             # use a sub-directory in the temproot to speed-up
+             # make_numbered_dir() call
+             rootdir = temproot.joinpath(f"pytest-of-{user}")
+-            rootdir.mkdir(exist_ok=True)
++            try:
++                rootdir.mkdir(exist_ok=True)
++            except OSError:
++                # getuser() likely returned illegal characters for the platform, use unknown back off mechanism
++                rootdir = temproot.joinpath("pytest-of-unknown")
++                rootdir.mkdir(exist_ok=True)
+             basetemp = make_numbered_dir_with_cleanup(
+                 prefix="pytest-", root=rootdir, keep=3, lock_timeout=LOCK_TIMEOUT
+             )
+
+
+==============
+
+diff --git a/src/_pytest/python.py b/src/_pytest/python.py
+--- a/src/_pytest/python.py
++++ b/src/_pytest/python.py
+@@ -608,10 +608,10 @@ def _importtestmodule(self):
+             if e.allow_module_level:
+                 raise
+             raise self.CollectError(
+-                "Using pytest.skip outside of a test is not allowed. "
+-                "To decorate a test function, use the @pytest.mark.skip "
+-                "or @pytest.mark.skipif decorators instead, and to skip a "
+-                "module use `pytestmark = pytest.mark.{skip,skipif}."
++                "Using pytest.skip outside of a test will skip the entire module. "
++                "If that's your intention, pass `allow_module_level=True`. "
++                "If you want to skip a specific test or an entire class, "
++                "use the @pytest.mark.skip or @pytest.mark.skipif decorators."
+             ) from e
+         self.config.pluginmanager.consider_module(mod)
+         return mod
+
+
+==============
+
+diff --git a/src/_pytest/_code/source.py b/src/_pytest/_code/source.py
+--- a/src/_pytest/_code/source.py
++++ b/src/_pytest/_code/source.py
+@@ -149,6 +149,11 @@ def get_statement_startend2(lineno: int, node: ast.AST) -> Tuple[int, Optional[i
+     values: List[int] = []
+     for x in ast.walk(node):
+         if isinstance(x, (ast.stmt, ast.ExceptHandler)):
++            # Before Python 3.8, the lineno of a decorated class or function pointed at the decorator.
++            # Since Python 3.8, the lineno points to the class/def, so need to include the decorators.
++            if isinstance(x, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
++                for d in x.decorator_list:
++                    values.append(d.lineno - 1)
+             values.append(x.lineno - 1)
+             for name in ("finalbody", "orelse"):
+                 val: Optional[List[ast.stmt]] = getattr(x, name, None)
+
+
+==============
+
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -109,12 +109,14 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+     return {x.strip() for x in arg.split(',') if x.strip()}
+
+
+-def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
++def inherited_members_option(arg: Any) -> Set[str]:
+     """Used to convert the :members: option to auto directives."""
+     if arg in (None, True):
+-        return 'object'
++        return {'object'}
++    elif arg:
++        return set(x.strip() for x in arg.split(','))
+     else:
+-        return arg
++        return set()
+
+
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -680,9 +682,11 @@ def filter_members(self, members: ObjectMembers, want_all: bool
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
++            inherited_members = self.options.inherited_members or set()
++
+             if inspect.isclass(self.object):
+                 for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
++                    if cls.__name__ in inherited_members and cls != self.object:
+                         # given member is a member of specified *super class*
+                         return True
+                     elif name in cls.__dict__:
+
+
+==============
+
+diff --git a/sphinx/ext/autodoc/typehints.py b/sphinx/ext/autodoc/typehints.py
+--- a/sphinx/ext/autodoc/typehints.py
++++ b/sphinx/ext/autodoc/typehints.py
+@@ -115,7 +115,15 @@ def modify_field_list(node: nodes.field_list, annotations: Dict[str, str],
+         if name == 'return':
+             continue
+
+-        arg = arguments.get(name, {})
++        if '*' + name in arguments:
++            name = '*' + name
++            arguments.get(name)
++        elif '**' + name in arguments:
++            name = '**' + name
++            arguments.get(name)
++        else:
++            arg = arguments.get(name, {})
++
+         if not arg.get('type'):
+             field = nodes.field()
+             field += nodes.field_name('', 'type ' + name)
+@@ -167,13 +175,19 @@ def augment_descriptions_with_types(
+             has_type.add('return')
+
+     # Add 'type' for parameters with a description but no declared type.
+-    for name in annotations:
++    for name, annotation in annotations.items():
+         if name in ('return', 'returns'):
+             continue
++
++        if '*' + name in has_description:
++            name = '*' + name
++        elif '**' + name in has_description:
++            name = '**' + name
++
+         if name in has_description and name not in has_type:
+             field = nodes.field()
+             field += nodes.field_name('', 'type ' + name)
+-            field += nodes.field_body('', nodes.paragraph('', annotations[name]))
++            field += nodes.field_body('', nodes.paragraph('', annotation))
+             node += field
+
+     # Add 'rtype' if 'return' is present and 'rtype' isn't.
+
+
+==============
+
+diff --git a/sphinx/util/rst.py b/sphinx/util/rst.py
+--- a/sphinx/util/rst.py
++++ b/sphinx/util/rst.py
+@@ -10,22 +10,17 @@
+
+ from docutils.parsers.rst import roles
+ from docutils.parsers.rst.languages import en as english
++from docutils.parsers.rst.states import Body
+ from docutils.statemachine import StringList
+ from docutils.utils import Reporter
+-from jinja2 import Environment
++from jinja2 import Environment, pass_environment
+
+ from sphinx.locale import __
+ from sphinx.util import docutils, logging
+
+-try:
+-    from jinja2.utils import pass_environment
+-except ImportError:
+-    from jinja2 import environmentfilter as pass_environment
+-
+-
+ logger = logging.getLogger(__name__)
+
+-docinfo_re = re.compile(':\\w+:.*?')
++FIELD_NAME_RE = re.compile(Body.patterns['field_marker'])
+ symbols_re = re.compile(r'([!-\-/:-@\[-`{-~])')  # symbols without dot(0x2e)
+ SECTIONING_CHARS = ['=', '-', '~']
+
+@@ -80,7 +75,7 @@ def prepend_prolog(content: StringList, prolog: str) -> None:
+     if prolog:
+         pos = 0
+         for line in content:
+-            if docinfo_re.match(line):
++            if FIELD_NAME_RE.match(line):
+                 pos += 1
+             else:
+                 break
+@@ -91,6 +86,7 @@ def prepend_prolog(content: StringList, prolog: str) -> None:
+             pos += 1
+
+         # insert prolog (after docinfo if exists)
++        lineno = 0
+         for lineno, line in enumerate(prolog.splitlines()):
+             content.insert(pos + lineno, line, '<rst_prolog>', lineno)
+
+
+
+==============
+
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -18,6 +18,7 @@
+ """
+
+ import argparse
++import inspect
+ import locale
+ import os
+ import pkgutil
+@@ -176,6 +177,56 @@ def render(self, template_name: str, context: Dict) -> str:
+ # -- Generating output ---------------------------------------------------------
+
+
++class ModuleScanner:
++    def __init__(self, app: Any, obj: Any) -> None:
++        self.app = app
++        self.object = obj
++
++    def get_object_type(self, name: str, value: Any) -> str:
++        return get_documenter(self.app, value, self.object).objtype
++
++    def is_skipped(self, name: str, value: Any, objtype: str) -> bool:
++        try:
++            return self.app.emit_firstresult('autodoc-skip-member', objtype,
++                                             name, value, False, {})
++        except Exception as exc:
++            logger.warning(__('autosummary: failed to determine %r to be documented, '
++                              'the following exception was raised:\n%s'),
++                           name, exc, type='autosummary')
++            return False
++
++    def scan(self, imported_members: bool) -> List[str]:
++        members = []
++        for name in dir(self.object):
++            try:
++                value = safe_getattr(self.object, name)
++            except AttributeError:
++                value = None
++
++            objtype = self.get_object_type(name, value)
++            if self.is_skipped(name, value, objtype):
++                continue
++
++            try:
++                if inspect.ismodule(value):
++                    imported = True
++                elif safe_getattr(value, '__module__') != self.object.__name__:
++                    imported = True
++                else:
++                    imported = False
++            except AttributeError:
++                imported = False
++
++            if imported_members:
++                # list all members up
++                members.append(name)
++            elif imported is False:
++                # list not-imported members up
++                members.append(name)
++
++        return members
++
++
+ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+                                  template: AutosummaryRenderer, template_name: str,
+                                  imported_members: bool, app: Any,
+@@ -246,7 +297,8 @@ def get_modules(obj: Any) -> Tuple[List[str], List[str]]:
+     ns.update(context)
+
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        scanner = ModuleScanner(app, obj)
++        ns['members'] = scanner.scan(imported_members)
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \
+
+
+==============
+
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -318,7 +318,7 @@ def _dedent(self, lines: List[str], full: bool = False) -> List[str]:
+             return [line[min_indent:] for line in lines]
+
+     def _escape_args_and_kwargs(self, name: str) -> str:
+-        if name.endswith('_'):
++        if name.endswith('_') and getattr(self._config, 'strip_signature_backslash', False):
+             name = name[:-1] + r'\_'
+
+         if name[:2] == '**':
+
+
+==============
+
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -98,9 +98,8 @@ def keyfunc0(entry: Tuple[str, str]) -> Tuple[bool, str]:
+             for subentry in indexentry[1].values():
+                 subentry[0].sort(key=keyfunc0)  # type: ignore
+
+-        # sort the index entries; put all symbols at the front, even those
+-        # following the letters in ASCII, this is where the chr(127) comes from
+-        def keyfunc(entry: Tuple[str, List]) -> Tuple[str, str]:
++        # sort the index entries
++        def keyfunc(entry: Tuple[str, List]) -> Tuple[Tuple[int, str], str]:
+             key, (void, void, category_key) = entry
+             if category_key:
+                 # using specified category key to sort
+@@ -108,11 +107,16 @@ def keyfunc(entry: Tuple[str, List]) -> Tuple[str, str]:
+             lckey = unicodedata.normalize('NFD', key.lower())
+             if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
+                 lckey = lckey[1:]
++
+             if lckey[0:1].isalpha() or lckey.startswith('_'):
+-                lckey = chr(127) + lckey
++                # put non-symbol characters at the folloing group (1)
++                sortkey = (1, lckey)
++            else:
++                # put symbols at the front of the index (0)
++                sortkey = (0, lckey)
+             # ensure a determinstic order *within* letters by also sorting on
+             # the entry itself
+-            return (lckey, entry[0])
++            return (sortkey, entry[0])
+         newlist = sorted(new.items(), key=keyfunc)
+
+         if group_entries:
+
+
+==============
+
+diff --git a/sphinx/builders/manpage.py b/sphinx/builders/manpage.py
+--- a/sphinx/builders/manpage.py
++++ b/sphinx/builders/manpage.py
+@@ -24,7 +24,7 @@
+ from sphinx.util import progress_message
+ from sphinx.util.console import darkgreen  # type: ignore
+ from sphinx.util.nodes import inline_all_toctrees
+-from sphinx.util.osutil import make_filename_from_project
++from sphinx.util.osutil import ensuredir, make_filename_from_project
+ from sphinx.writers.manpage import ManualPageWriter, ManualPageTranslator
+
+
+@@ -80,7 +80,12 @@ def write(self, *ignored: Any) -> None:
+             docsettings.authors = authors
+             docsettings.section = section
+
+-            targetname = '%s.%s' % (name, section)
++            if self.config.man_make_section_directory:
++                ensuredir(path.join(self.outdir, str(section)))
++                targetname = '%s/%s.%s' % (section, name, section)
++            else:
++                targetname = '%s.%s' % (name, section)
++
+             logger.info(darkgreen(targetname) + ' { ', nonl=True)
+             destination = FileOutput(
+                 destination_path=path.join(self.outdir, targetname),
+@@ -115,6 +120,7 @@ def setup(app: Sphinx) -> Dict[str, Any]:
+
+     app.add_config_value('man_pages', default_man_pages, None)
+     app.add_config_value('man_show_urls', False, None)
++    app.add_config_value('man_make_section_directory', False, None)
+
+     return {
+         'version': 'builtin',
+
+
+==============
+
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -1240,7 +1240,9 @@ def add_directive_header(self, sig: str) -> None:
+
+     def format_signature(self, **kwargs: Any) -> str:
+         sigs = []
+-        if self.analyzer and '.'.join(self.objpath) in self.analyzer.overloads:
++        if (self.analyzer and
++                '.'.join(self.objpath) in self.analyzer.overloads and
++                self.env.config.autodoc_typehints == 'signature'):
+             # Use signatures for overloaded functions instead of the implementation function.
+             overloaded = True
+         else:
+@@ -1474,7 +1476,7 @@ def format_signature(self, **kwargs: Any) -> str:
+         sigs = []
+
+         overloads = self.get_overloaded_signatures()
+-        if overloads:
++        if overloads and self.env.config.autodoc_typehints == 'signature':
+             # Use signatures for overloaded methods instead of the implementation method.
+             method = safe_getattr(self._signature_class, self._signature_method_name, None)
+             __globals__ = safe_getattr(method, '__globals__', {})
+@@ -1882,7 +1884,9 @@ def document_members(self, all_members: bool = False) -> None:
+
+     def format_signature(self, **kwargs: Any) -> str:
+         sigs = []
+-        if self.analyzer and '.'.join(self.objpath) in self.analyzer.overloads:
++        if (self.analyzer and
++                '.'.join(self.objpath) in self.analyzer.overloads and
++                self.env.config.autodoc_typehints == 'signature'):
+             # Use signatures for overloaded methods instead of the implementation method.
+             overloaded = True
+         else:
+
+
+==============
+
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -1702,7 +1702,8 @@ def add_directive_header(self, sig: str) -> None:
+         if not self.options.annotation:
+             # obtain annotation for this data
+             try:
+-                annotations = get_type_hints(self.parent)
++                annotations = get_type_hints(self.parent, None,
++                                             self.config.autodoc_type_aliases)
+             except NameError:
+                 # Failed to evaluate ForwardRef (maybe TYPE_CHECKING)
+                 annotations = safe_getattr(self.parent, '__annotations__', {})
+@@ -2093,7 +2094,8 @@ def add_directive_header(self, sig: str) -> None:
+         if not self.options.annotation:
+             # obtain type annotation for this attribute
+             try:
+-                annotations = get_type_hints(self.parent)
++                annotations = get_type_hints(self.parent, None,
++                                             self.config.autodoc_type_aliases)
+             except NameError:
+                 # Failed to evaluate ForwardRef (maybe TYPE_CHECKING)
+                 annotations = safe_getattr(self.parent, '__annotations__', {})
+
+
+==============
+
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -852,8 +852,9 @@ def _resolve_numref_xref(self, env: "BuildEnvironment", fromdocname: str,
+             if fignumber is None:
+                 return contnode
+         except ValueError:
+-            logger.warning(__("no number is assigned for %s: %s"), figtype, labelid,
+-                           location=node)
++            logger.warning(__("Failed to create a cross reference. Any number is not "
++                              "assigned: %s"),
++                           labelid, location=node)
+             return contnode
+
+         try:
+
+
+==============
+
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -43,7 +43,7 @@
+
+
+ # RE for option descriptions
+-option_desc_re = re.compile(r'((?:/|--|-|\+)?[^\s=[]+)(=?\s*.*)')
++option_desc_re = re.compile(r'((?:/|--|-|\+)?[^\s=]+)(=?\s*.*)')
+ # RE for grammar tokens
+ token_re = re.compile(r'`(\w+)`', re.U)
+
+@@ -197,6 +197,11 @@ def handle_signature(self, sig: str, signode: desc_signature) -> str:
+                                location=signode)
+                 continue
+             optname, args = m.groups()
++            if optname.endswith('[') and args.endswith(']'):
++                # optional value surrounded by brackets (ex. foo[=bar])
++                optname = optname[:-1]
++                args = '[' + args
++
+             if count:
+                 signode += addnodes.desc_addname(', ', ', ')
+             signode += addnodes.desc_name(optname, optname)
+
+
+==============
+
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -1074,7 +1074,7 @@ def get_module_members(self) -> Dict[str, ObjectMember]:
+     def get_object_members(self, want_all: bool) -> Tuple[bool, ObjectMembers]:
+         members = self.get_module_members()
+         if want_all:
+-            if not self.__all__:
++            if self.__all__ is None:
+                 # for implicit module members, check __module__ to avoid
+                 # documenting imported objects
+                 return True, list(members.values())
+
+
+==============
+
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -10,6 +10,7 @@
+
+ import sys
+ import typing
++from struct import Struct
+ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, TypeVar, Union
+
+ from docutils import nodes
+@@ -94,6 +95,9 @@ def restify(cls: Optional["Type"]) -> str:
+         return ':obj:`None`'
+     elif cls is Ellipsis:
+         return '...'
++    elif cls is Struct:
++        # Before Python 3.9, struct.Struct class has incorrect __module__.
++        return ':class:`struct.Struct`'
+     elif inspect.isNewType(cls):
+         return ':class:`%s`' % cls.__name__
+     elif cls.__module__ in ('__builtin__', 'builtins'):
+@@ -305,6 +309,9 @@ def stringify(annotation: Any) -> str:
+         return annotation.__qualname__
+     elif annotation is Ellipsis:
+         return '...'
++    elif annotation is Struct:
++        # Before Python 3.9, struct.Struct class has incorrect __module__.
++        return 'struct.Struct'
+
+     if sys.version_info >= (3, 7):  # py37+
+         return _stringify_py37(annotation)
+
+
+==============
+
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -682,7 +682,13 @@ def _parse_notes_section(self, section: str) -> List[str]:
+         return self._parse_generic_section(_('Notes'), use_admonition)
+
+     def _parse_other_parameters_section(self, section: str) -> List[str]:
+-        return self._format_fields(_('Other Parameters'), self._consume_fields())
++        if self._config.napoleon_use_param:
++            # Allow to declare multiple parameters at once (ex: x, y: int)
++            fields = self._consume_fields(multiple=True)
++            return self._format_docutils_params(fields)
++        else:
++            fields = self._consume_fields()
++            return self._format_fields(_('Other Parameters'), fields)
+
+     def _parse_parameters_section(self, section: str) -> List[str]:
+         if self._config.napoleon_use_param:
+
+
+==============
+
+diff --git a/sphinx/ext/viewcode.py b/sphinx/ext/viewcode.py
+--- a/sphinx/ext/viewcode.py
++++ b/sphinx/ext/viewcode.py
+@@ -182,6 +182,10 @@ def collect_pages(app: Sphinx) -> Generator[Tuple[str, Dict[str, Any], str], Non
+     env = app.builder.env
+     if not hasattr(env, '_viewcode_modules'):
+         return
++    if app.builder.name == "singlehtml":
++        return
++    if app.builder.name.startswith("epub") and not env.config.viewcode_enable_epub:
++        return
+     highlighter = app.builder.highlighter  # type: ignore
+     urito = app.builder.get_relative_uri
+
+
+
+==============
+
+diff --git a/sphinx/ext/autodoc/importer.py b/sphinx/ext/autodoc/importer.py
+--- a/sphinx/ext/autodoc/importer.py
++++ b/sphinx/ext/autodoc/importer.py
+@@ -294,24 +294,35 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+
+     try:
+         for cls in getmro(subject):
++            try:
++                modname = safe_getattr(cls, '__module__')
++                qualname = safe_getattr(cls, '__qualname__')
++                analyzer = ModuleAnalyzer.for_module(modname)
++                analyzer.analyze()
++            except AttributeError:
++                qualname = None
++                analyzer = None
++            except PycodeError:
++                analyzer = None
++
+             # annotation only member (ex. attr: int)
+             for name in getannotations(cls):
+                 name = unmangle(cls, name)
+                 if name and name not in members:
+-                    members[name] = ObjectMember(name, INSTANCEATTR, class_=cls)
++                    if analyzer and (qualname, name) in analyzer.attr_docs:
++                        docstring = '\n'.join(analyzer.attr_docs[qualname, name])
++                    else:
++                        docstring = None
++
++                    members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
++                                                 docstring=docstring)
+
+             # append instance attributes (cf. self.attr1) if analyzer knows
+-            try:
+-                modname = safe_getattr(cls, '__module__')
+-                qualname = safe_getattr(cls, '__qualname__')
+-                analyzer = ModuleAnalyzer.for_module(modname)
+-                analyzer.analyze()
++            if analyzer:
+                 for (ns, name), docstring in analyzer.attr_docs.items():
+                     if ns == qualname and name not in members:
+                         members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
+                                                      docstring='\n'.join(docstring))
+-            except (AttributeError, PycodeError):
+-                pass
+     except AttributeError:
+         pass
+
