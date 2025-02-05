@@ -71,7 +71,7 @@ class ProblemSolversCrew:
     def editor(self) -> Agent:
         return Agent(
             config=self.agents_config["editor"],
-            llm=swe_llm,
+            llm=gemini_llm,
             tools=self.tools,
         )
 
