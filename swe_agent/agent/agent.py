@@ -110,7 +110,8 @@ if __name__ == '__main__':
         gold_file_path = re.findall(r"(?<=diff --git a)\S+", issue_data["patch"])[0]
         print(extract_owner_repo_issue_num(issue_data["instance_id"]), issue_data["base_commit"], gold_file_path, issue_data["hints_text"])
         owner, repo, issue_num = extract_owner_repo_issue_num(issue_data["instance_id"])
-        if owner == 'django' and issue_num == '10914': # 10914, 12708, 14382, 13230
+        commit_hash = issue_data["base_commit"]
+        if repo == 'seaborn' and issue_num == '3010': # 10914, 12708, 14382, 13230
             break
     # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
     composio_tool_set = ComposioToolSet()
@@ -120,27 +121,26 @@ if __name__ == '__main__':
         params=dict(owner=owner, repo=repo, issue_number=int(issue_num)),
     ).get("data", {}).get("body", None)
 
+
+    import subprocess
     faulty_repos_dir = Path(Path.home(), "repos")
     os.makedirs(faulty_repos_dir, exist_ok=True)
 
-    print("changing dir")
+    repo_url = f"https://github.com/{owner}/{repo}.git"
+    clone_command = ["git", "clone", repo_url]
+    print(f"Running {' '.join(clone_command)}")
+    subprocess.run(clone_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=faulty_repos_dir)
+
+    repo_path = Path(faulty_repos_dir, Path(repo_url).stem).absolute()
+    checkout_command = ["git", "checkout", commit_hash]
+    print(f"Running  {' '.join(checkout_command)} and moving to error checkpoint")
+    subprocess.run(checkout_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                   cwd=repo_path)
+
+    print(f"changing composio working directory to {repo_path}")
     composio_tool_set.execute_action(
         action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
-        params={"path": str(faulty_repos_dir)},
-    )
-
-    print("cloning")
-    # clone the repo in the faulty_repos_dir
-    composio_tool_set.execute_action(
-        action=Action.FILETOOL_GIT_CLONE,
-        params={"repo_name": f"{owner}/{repo}"},
-    )
-
-
-    print("changing dir")
-    composio_tool_set.execute_action(
-        action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
-        params={"path": str(faulty_repos_dir / repo)},
+        params={"path": str(repo_path)},
     )
 
     print("getting git repo tree")
@@ -149,24 +149,9 @@ if __name__ == '__main__':
         params={},
     )
 
-    print("extracting it manually")
-    import os
-    repo_listdir = os.listdir(str(faulty_repos_dir / repo))
-
-
-    def get_commit_hash(owner, repo, issue_num):
-        return swe_bench_test_dataset.filter(lambda x: x['instance_id'] == f"{owner}__{repo}-{issue_num}")["base_commit"][0]
-
-
-    print("checkout")
-    # get the error commit as the current codebase
-    composio_tool_set.execute_action(
-        action=Action.FILETOOL_GIT_CUSTOM,
-        params={"cmd": f"checkout {get_commit_hash(owner, repo, issue_num)}^"},
-    )
-    crew = ProblemSolversCrew().crew()
-    crew_output = crew.kickoff(inputs=dict(repo=owner + "/" + repo, issue=issue))
-    print(crew_output)
+    # crew = ProblemSolversCrew().crew()
+    # crew_output = crew.kickoff(inputs=dict(repo=owner + "/" + repo, issue=issue))
+    # print(crew_output)
 
     #crew = ProblemSolversCrew().crew()
     #crew_output = crew.kickoff(inputs=dict(repo=owner+"/"+repo, issue=issue))
