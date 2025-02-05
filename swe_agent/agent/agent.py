@@ -18,8 +18,8 @@ gemini_llm = LLM(
 # https://endpoints.huggingface.co/kkakkavas/endpoints/swe-llama-7b-ugn
 swe_llm = LLM(
     model="huggingface/princeton-nlp/SWE-Llama-7b",
-    max_tokens=100,
-    api_base="https://a2w1zm7lm6u7def9.us-east-1.aws.endpoints.huggingface.cloud",
+    max_tokens=1000,
+    base_url="https://a2w1zm7lm6u7def9.us-east-1.aws.endpoints.huggingface.cloud",
 )
 from langchain_openai import ChatOpenAI
 
@@ -71,7 +71,7 @@ class ProblemSolversCrew:
     def editor(self) -> Agent:
         return Agent(
             config=self.agents_config["editor"],
-            llm=gemini_llm,
+            llm=swe_llm,
             tools=self.tools,
         )
 
@@ -110,7 +110,7 @@ if __name__ == '__main__':
         gold_file_path = re.findall(r"(?<=diff --git a)\S+", issue_data["patch"])[0]
         print(extract_owner_repo_issue_num(issue_data["instance_id"]), issue_data["base_commit"], gold_file_path, issue_data["hints_text"])
         owner, repo, issue_num = extract_owner_repo_issue_num(issue_data["instance_id"])
-        if owner == 'django' and issue_num == '': # 10914, 12708, 14382, 13230
+        if owner == 'django' and issue_num == '10914': # 10914, 12708, 14382, 13230
             break
     # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
     composio_tool_set = ComposioToolSet()
