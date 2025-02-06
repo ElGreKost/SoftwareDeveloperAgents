@@ -1,35 +1,25 @@
 planner_task:
     description: |
-      We're currently solving the following issue within our repository. 
+      We're currently analyzing the following issue within our repository. 
       Here's the issue text:
         ISSUE: {issue}
         REPO: {repo}
+        The error filepath is this: {gold_file_path}
 
-        STEPS:
-        1. Understand the GitHub Issue:
-        2. See all the files in the current directory with FILETOOL_LIST_FILES action:
-        3. See all the files in the current directory now with the git repo in the file system and create a plan to solve the issue.
-        4. Open the files you think should be examined and read the code. 
-        5. if you think you have enough information call EDIT FILE so that the Editor can edit the code.
-      
-      Your current working directory is inside the repo.
-      
+      Understand the GitHub Issue and create a list of files that could be useful for the editor to examine and 
+      solve the issue according to issue, issue_hing, error filepath.
 
+      Don't try to clone the repository.
+      The repo is already cloned and your current working directory is inside the 
+      repo.
 
       Now, you're going solve the issue and guide a Code Editor to make changes to the code until you're 
       satisfied with all of the changes he's made. Then you can submit these changes to the code base by 
-      simply running the submit command. Note however that you cannot use any interactive
-      session commands (e.g. python, vim) in this environment, but you can write
-      scripts and run them. E.g. you can write a python script and then run it
-      with `python </path/to/script>.py`. Note however that you cannot use 
-      any interactive session commands (e.g. python, vim), 
-
-      If you are facing "module not found error", you can install dependencies.
-      Example: in case error is "pandas not found", install pandas like this `pip install pandas`
+      simply running the submit command.
     expected_output: |
-      Your response should contain only one of the following actions:
-      "EDIT FILE", "PATCH COMPLETED",
-      along with a short instruction on what to do next in txt format.
+      Your response should contain the that after thorough analysis of the issue the editor needs to further examine,
+      also for every file a small description on what is the reason this file could be problematic. 
+      Furthermore give instructions on the next steps of hte editor agent my telling him how to examine the files.
     agent: planner
 
 editor_task:
@@ -38,11 +28,9 @@ editor_task:
       Here's the issue text:
         ISSUE: {issue}
         REPO: {repo}
-
-      Now, you're going to edit the code on your own, as instructed by the planner. 
-      When you've made all the necessary edits, you can return the patch to the planner. Note 
-      however that you cannot use any interactive session commands (e.g. python, vim) in this
-      environment, nor write and run python scripts.
+      
+      Your task is to examine the files returned by the planner and examine them to find out the improvements that 
+      have to be done so that the issue is resolved and a Pull Request can be created for this repository.
     expected_output:
-      A patch should be generated which fixes the given issue and a PR should be created
+      First a list of changes the model did to the files, then the patch generated using the patch generation tool.
     agent: editor

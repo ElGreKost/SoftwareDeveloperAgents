@@ -93,7 +93,8 @@ class ProblemSolversCrew:
             agents=[self.planner(), self.editor()],
             tasks=[self.planner_task(), self.editor_task()],
             process=Process.sequential,
-            verbose=True
+            verbose=True,
+            # planning=True,
         )
 
 if __name__ == '__main__':
@@ -108,23 +109,19 @@ if __name__ == '__main__':
     for issue_data in swe_bench_test_dataset:
         import re
         gold_file_path = re.findall(r"(?<=diff --git a)\S+", issue_data["patch"])[0]
-        print(extract_owner_repo_issue_num(issue_data["instance_id"]), issue_data["base_commit"], gold_file_path, issue_data["hints_text"])
+        hints_text = issue_data["hints_text"]
+        # print(extract_owner_repo_issue_num(issue_data["instance_id"]), issue_data["base_commit"], gold_file_path, issue_data["hints_text"])
+        issue = issue_data["problem_statement"]
         owner, repo, issue_num = extract_owner_repo_issue_num(issue_data["instance_id"])
         commit_hash = issue_data["base_commit"]
-        if repo == 'seaborn' and issue_num == '3010': # 10914, 12708, 14382, 13230
+        if repo == 'seaborn' and issue_num == '2848': # 10914, 12708, 14382, 13230
             break
     # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
     composio_tool_set = ComposioToolSet()
-    print("getting issue")
-    issue = composio_tool_set.execute_action(
-        action=Action.GITHUB_GET_AN_ISSUE,
-        params=dict(owner=owner, repo=repo, issue_number=int(issue_num)),
-    ).get("data", {}).get("body", None)
-
 
     import subprocess
     faulty_repos_dir = Path(Path.home(), "repos")
-    os.makedirs(faulty_repos_dir, exist_ok=True)
+    faulty_repos_dir.mkdir(exist_ok=True, parents=True)
 
     repo_url = f"https://github.com/{owner}/{repo}.git"
     clone_command = ["git", "clone", repo_url]
@@ -143,16 +140,11 @@ if __name__ == '__main__':
         params={"path": str(repo_path)},
     )
 
-    print("getting git repo tree")
-    composio_tool_set.execute_action(
-        action=Action.FILETOOL_GIT_REPO_TREE,
-        params={},
-    )
-
+    print(str(repo_path / gold_file_path))
     # crew = ProblemSolversCrew().crew()
-    # crew_output = crew.kickoff(inputs=dict(repo=owner + "/" + repo, issue=issue))
+    # crew_output = crew.kickoff(inputs=dict(
+    #     repo=str(repo_path),
+    #     issue=issue,
+    #     gold_file_path=str(repo_path / gold_file_path)
+    # ))
     # print(crew_output)
-
-    #crew = ProblemSolversCrew().crew()
-    #crew_output = crew.kickoff(inputs=dict(repo=owner+"/"+repo, issue=issue))
-    #print(crew_output)
