@@ -123,8 +123,9 @@ if __name__ == '__main__':
         owner, repo, issue_num = extract_owner_repo_issue_num(issue_data["instance_id"])
         commit_hash = issue_data["base_commit"]
         # if repo == 'django' and issue_num == 109: # django-10914, django-12708, django-14382, django-13230
-        if repo == "sympy" and issue_num == "22714":
+        if repo == "requests" and issue_num == "863":
             break
+    print(issue_data["instance_id"])
     # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
     composio_tool_set = ComposioToolSet()
 
@@ -159,3 +160,5 @@ if __name__ == '__main__':
     ))
 
     print(crew_output.raw)
+
+

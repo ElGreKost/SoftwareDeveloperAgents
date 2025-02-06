@@ -7,16 +7,17 @@ planner_task:
         The error filepath is this: {gold_file_path} and THIS IS WHERE THE EDIT IN THE CODEBASE SHOULD HAPPEN so examine thoroughly.
 
       Understand the GitHub Issue and create a list of files that could be useful for the editor to examine and 
-      solve the issue according to issue, issue_hing, error filepath.
+      solve the issue according to issue, error filepath.
 
       Don't try to clone the repository.
       The repo is already cloned and your current working directory is above the
       repo with absolute path: {repo_parent}
       The first thing you should do is change the current working directory to the main directory of the repository so to {repo_name}
+        Be careful since you are already in /home/ubuntu/repos and the FILETOOL_CHANGE_DIRECTORY takes relative paths give give as argument the {repo_name}
 
-      Now, you're going solve the issue and guide a Code Editor to make changes to the code until you're 
+      ???? Now, you're going solve the issue and guide a Code Editor to make changes to the code until you're
       satisfied with all of the changes he's made. Then you can submit these changes to the code base by 
-      simply running the submit command.
+      simply running the submit command. ?????
 
     expected_output:
       Your response should contain the that after thorough analysis of the issue the editor needs to further examine,
