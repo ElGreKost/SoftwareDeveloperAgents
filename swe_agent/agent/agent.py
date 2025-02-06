@@ -10,9 +10,9 @@ from crewai.project import agent, task, CrewBase, crew
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_llm = LLM(
-    model="gemini/gemini-1.5-flash-8b",
+    model="gemini/gemini-1.5-flash",
     api_key=GEMINI_API_KEY,
-    temperature=0,
+    temperature=0.2,
 )
 # to get the api base link, you have to activate the inference endpoint from
 # https://endpoints.huggingface.co/kkakkavas/endpoints/swe-llama-7b-ugn
@@ -98,13 +98,21 @@ class ProblemSolversCrew:
         )
 
 if __name__ == '__main__':
+    import re
     from pathlib import Path
     from datasets import load_dataset
     swe_bench_test_dataset = load_dataset("princeton-nlp/SWE-bench", split="test")
 
     # from inputs import from_github; repo, issue = from_github() # for cli tests
     def extract_owner_repo_issue_num(instance_id):
-        owner__repo, issue_num = instance_id.split("-")
+        pattern = r'^(?P<owner_repo>.+)-(?P<issue_num>[^-]+)$'
+        match = re.match(pattern, instance_id)
+        if not match:
+            raise ValueError("Invalid instance_id format")
+
+        owner__repo = match.group("owner_repo")
+        issue_num = match.group("issue_num")
+
         return owner__repo.split("__")[0], owner__repo.split("__")[1], issue_num
     for issue_data in swe_bench_test_dataset:
         import re
@@ -114,7 +122,8 @@ if __name__ == '__main__':
         issue = issue_data["problem_statement"]
         owner, repo, issue_num = extract_owner_repo_issue_num(issue_data["instance_id"])
         commit_hash = issue_data["base_commit"]
-        if repo == 'seaborn' and issue_num == '2848': # 10914, 12708, 14382, 13230
+        # if repo == 'django' and issue_num == 109: # django-10914, django-12708, django-14382, django-13230
+        if repo == "sympy" and issue_num == "22714":
             break
     # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
     composio_tool_set = ComposioToolSet()
@@ -140,11 +149,13 @@ if __name__ == '__main__':
         params={"path": str(repo_path)},
     )
 
-    print(str(repo_path / gold_file_path))
-    # crew = ProblemSolversCrew().crew()
-    # crew_output = crew.kickoff(inputs=dict(
-    #     repo=str(repo_path),
-    #     issue=issue,
-    #     gold_file_path=str(repo_path / gold_file_path)
-    # ))
-    # print(crew_output)
+    crew = ProblemSolversCrew().crew()
+    crew_output = crew.kickoff(inputs=dict(
+        repo=str(repo_path),
+        repo_name=repo,
+        repo_parent=str(repo_path.parent),
+        issue=issue,
+        gold_file_path=str(repo_path) + str(gold_file_path)
+    ))
+
+    print(crew_output.raw)
