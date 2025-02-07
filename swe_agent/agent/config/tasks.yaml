@@ -5,6 +5,10 @@ planner_task:
         ISSUE: {issue}
         REPO: {repo}
         The error filepath is this: {gold_file_path} and THIS IS WHERE THE EDIT IN THE CODEBASE SHOULD HAPPEN so examine thoroughly.
+          If the file is too long and you haven't found the possible error use either:
+            * FILETOOL_SCROLL to examine the file as far as you need to be
+            * FILETOOL_SEARCH_WORD to find the word references if you know the error words or keywords that could help you navigate.
+          sure that you are ready to delegate the list of changes to the editor
 
       Understand the GitHub Issue and create a list of files that could be useful for the editor to examine and 
       solve the issue according to issue, error filepath.
@@ -14,6 +18,8 @@ planner_task:
       repo with absolute path: {repo_parent}
       The first thing you should do is change the current working directory to the main directory of the repository so to {repo_name}
         Be careful since you are already in /home/ubuntu/repos and the FILETOOL_CHANGE_DIRECTORY takes relative paths give give as argument the {repo_name}
+
+
 
       ???? Now, you're going solve the issue and guide a Code Editor to make changes to the code until you're
       satisfied with all of the changes he's made. Then you can submit these changes to the code base by 
