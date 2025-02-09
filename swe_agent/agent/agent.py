@@ -57,14 +57,23 @@ class ProblemSolversCrew:
         action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
         params={"path": str(projects_root)},
     )
+
     tools = [*toolset.get_tools(apps=[App.FILETOOL, App.SHELLTOOL])]
+
+    planner_tools = [
+        tool for tool in tools if tool.name in {"FILETOOL_OPEN_FILE", "FILETOOL_SCROLL", "FILETOOL_SEARCH_WORD", "FILETOOL_CHANGE_WORKING_DIRECTORY"}
+    ]
+
+    editor_tools = [
+        tool for tool in tools if tool.name in {"FILETOOL_OPEN_FILE", "FILETOOL_SCROLL", "FILETOOL_SEARCH_WORD", "FILETOOL_CHANGE_WORKING_DIRECTORY", "FILETOOL_EDIT_FILE", "FILETOOL_GIT_PATCH"}
+    ]
 
     @agent
     def planner(self) -> Agent:
         return Agent(
             config=self.agents_config["planner"],
             llm=gemini_llm,
-            tools=self.tools,
+            tools=self.planner_tools,
         )
 
     @agent
@@ -72,7 +81,7 @@ class ProblemSolversCrew:
         return Agent(
             config=self.agents_config["editor"],
             llm=gemini_llm,
-            tools=self.tools,
+            tools=self.editor_tools,
         )
 
     @task
@@ -123,7 +132,7 @@ if __name__ == '__main__':
         owner, repo, issue_num = extract_owner_repo_issue_num(issue_data["instance_id"])
         commit_hash = issue_data["base_commit"]
         # if repo == 'django' and issue_num == 109: # django-10914, django-12708, django-14382, django-13230
-        if repo == "requests" and issue_num == "863":
+        if repo == "seaborn" and issue_num == "3407":
             break
     print(issue_data["instance_id"])
     # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
