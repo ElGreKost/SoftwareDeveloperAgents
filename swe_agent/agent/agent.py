@@ -48,7 +48,7 @@ else:
 @CrewBase
 class ProblemSolversCrew:
     agents_config: str | dict = "config/agents.yaml"
-    tasks_config: str | dict = "config/tasks.yaml"
+    tasks_config: str | dict = "config/analytic_tasks.yaml"
 
     toolset = ComposioToolSet(api_key="jhelsrsn9a8shezjwi0ssc")
     projects_root = Path(Path.home() / "repos")
@@ -132,7 +132,7 @@ if __name__ == '__main__':
         owner, repo, issue_num = extract_owner_repo_issue_num(issue_data["instance_id"])
         commit_hash = issue_data["base_commit"]
         # if repo == 'django' and issue_num == 109: # django-10914, django-12708, django-14382, django-13230
-        if repo == "seaborn" and issue_num == "3407":
+        if repo == "django" and issue_num == "13230":
             break
     print(issue_data["instance_id"])
     # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"

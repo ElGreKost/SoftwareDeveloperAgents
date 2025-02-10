@@ -1,0 +1,69 @@
+planner_task:
+    description: |
+      We're currently analyzing the following issue within our repository. 
+      Here's the issue text:
+        ISSUE: {issue}
+        REPO: {repo}
+        The error filepath is this: {gold_file_path} and THIS IS WHERE THE EDIT IN THE CODEBASE SHOULD HAPPEN so examine thoroughly.
+          If the file is too long and you haven't found the possible error use either:
+            * FILETOOL_SCROLL to examine the file as far as you need to be
+            * FILETOOL_SEARCH_WORD to find the word references if you know the error words or keywords that could help you navigate.
+            
+      - First, understand the GitHub Issue, give your plan and change the current working directory to the main directory of the repository so to {repo_name}
+        Be careful since you are already in /home/ubuntu/repos and the FILETOOL_CHANGE_DIRECTORY takes relative paths give as argument the {repo_name}
+        Don't try to clone the repository.
+        The repo is already cloned and your current working directory is above the
+        repo with absolute path: {repo_parent}
+      - Second, use FILETOOL_OPEN_FILE in order to open the error file (reminder! error filepath is {gold_file_path}
+      - Third, identify the problematic parts of the file. Use FILETOOL_SEARCH_WORD or FILETOOL_SCROLL according to the instructions above.
+      - Fourth, create a list of parts that could be useful for the editor to examine to solve the issue and give your final answer. 
+        Make sure that you are ready to delegate the list of changes to the editor.
+
+    expected_output:
+      Your response should contain the parts of the file the editor should change in order to solve the issue and 
+      instructions for the next steps.
+    agent: planner
+
+editor_task:
+    description: |
+      We're currently solving the following issue within our repository. 
+      Here's the issue text:
+        ISSUE: {issue}
+        REPO: {repo}
+        the ERROR FILE WHERE the EDIT SHOULD HAPPEN is: {gold_file_path}
+      
+      Your task is to examine the parts returned by the planner and to find out the improvements that 
+      have to be done so that the issue is resolved and a Pull Request can be created for this repository.
+      
+      - First, understand the GitHub issue and examine the parts and the instructions returned by the Planner. Use FILETOOL_OPEN_FILE in order to open the error file.
+      - Second, if needed, use FILETOOL_SEARCH_WORD or FILETOOL_SCROLL so as to find the specific line(s) that need to change.
+      - Third, use FILETOOL_EDIT_FILE to make changes to the file. 
+      - Fourth, use FILETOOL_GIT_PATCH to create the corresponding patch.
+      
+      # Tool Specifications.
+      When you do the edit you are about to generate the patch with FILETOOL_GIT_PATCH make sure that you are in the
+      repository root folder because you need to be in the same working directory with the .git file.
+      So you have to change the working directory first to {repo} then call the FILETOOL_GIT_PATCH
+
+      ### Tool Documentation so that you can use it with certainty
+      Tool Name: FILETOOL_GIT_PATCH
+      Tool Arguments: {{'file_manager_id': {{'description': 'ID of the file manager where the file will be opened, if not provided the recent file manager will be used to execute the action. Please provide a value of type string.', 'type': 'str'}}, 'new_file_paths': {{'description': 'Paths of the files newly created to be included in the patch.', 'type': 'list[str]'}}}}
+      Tool Description: Get The Patch From The Current Working Directory.
+      This Action Generates A Git Patch That Includes All Changes In The Current Working Directory, Including Newly Created Files Specified In The Request.
+      The Patch Is In The Format Of A Proper Diff And Includes Deleted Files By Default.
+      Usage Example: New File Paths: ["Path/To/New/File1.Txt", "Path/To/New/File2.Py"]
+      The Resulting Patch Will Be In The Format:
+        Diff
+        Git A/Repo/Example.Py
+        B/Repo/Example.Py
+        Index 1234567..89Abcde 100644
+        A/Repo/Example.Py
+        +++ B/Repo/Example.Py
+        @@  1 +1 @@
+        Hello, World!
+        +Hello, Composio!
+      Note: This Action Should Be Run After All Changes Are Made To Add And Check The Result.
+
+    expected_output:
+      First a list of changes the model did to the files, then the patch generated using the patch generation tool.
+    agent: editor
