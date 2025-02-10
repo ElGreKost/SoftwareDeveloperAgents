@@ -8,6 +8,8 @@ import typing as t
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import agent, task, CrewBase, crew
 
+from preprocess_dataset import get_solved_dataset
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 gemini_llm = LLM(
     model="gemini/gemini-2.0-flash-001",
@@ -61,11 +63,14 @@ class ProblemSolversCrew:
     tools = [*toolset.get_tools(apps=[App.FILETOOL, App.SHELLTOOL])]
 
     planner_tools = [
-        tool for tool in tools if tool.name in {"FILETOOL_OPEN_FILE", "FILETOOL_SCROLL", "FILETOOL_SEARCH_WORD", "FILETOOL_CHANGE_WORKING_DIRECTORY"}
+        tool for tool in tools if tool.name in {"FILETOOL_OPEN_FILE", "FILETOOL_SCROLL", "FILETOOL_SEARCH_WORD",
+                                                "FILETOOL_CHANGE_WORKING_DIRECTORY"}
     ]
 
     editor_tools = [
-        tool for tool in tools if tool.name in {"FILETOOL_OPEN_FILE", "FILETOOL_SCROLL", "FILETOOL_SEARCH_WORD", "FILETOOL_CHANGE_WORKING_DIRECTORY", "FILETOOL_EDIT_FILE", "FILETOOL_GIT_PATCH"}
+        tool for tool in tools if tool.name in {"FILETOOL_OPEN_FILE", "FILETOOL_SCROLL", "FILETOOL_SEARCH_WORD",
+                                                "FILETOOL_CHANGE_WORKING_DIRECTORY", "FILETOOL_EDIT_FILE",
+                                                "FILETOOL_GIT_PATCH"}
     ]
 
     @agent
@@ -106,68 +111,52 @@ class ProblemSolversCrew:
             # planning=True,
         )
 
+
 if __name__ == '__main__':
     import re
     from pathlib import Path
     from datasets import load_dataset
-    swe_bench_test_dataset = load_dataset("princeton-nlp/SWE-bench", split="test")
 
-    # from inputs import from_github; repo, issue = from_github() # for cli tests
-    def extract_owner_repo_issue_num(instance_id):
-        pattern = r'^(?P<owner_repo>.+)-(?P<issue_num>[^-]+)$'
-        match = re.match(pattern, instance_id)
-        if not match:
-            raise ValueError("Invalid instance_id format")
+    # load the planner coder solved dataset
+    solved_ds = get_solved_dataset()
 
-        owner__repo = match.group("owner_repo")
-        issue_num = match.group("issue_num")
+    for issue_data in solved_ds:
+        owner, repo, issue_num, issue_text, commit_hash, gold_file_path = issue_data["owner"], issue_data["repo"], \
+        issue_data["issue_num"], issue_data["issue_text"], issue_data["commit_hash"], issue_data["gold_file_path"]
 
-        return owner__repo.split("__")[0], owner__repo.split("__")[1], issue_num
-    for issue_data in swe_bench_test_dataset:
-        import re
-        gold_file_path = re.findall(r"(?<=diff --git a)\S+", issue_data["patch"])[0]
-        hints_text = issue_data["hints_text"]
-        # print(extract_owner_repo_issue_num(issue_data["instance_id"]), issue_data["base_commit"], gold_file_path, issue_data["hints_text"])
-        issue = issue_data["problem_statement"]
-        owner, repo, issue_num = extract_owner_repo_issue_num(issue_data["instance_id"])
-        commit_hash = issue_data["base_commit"]
-        # if repo == 'django' and issue_num == 109: # django-10914, django-12708, django-14382, django-13230
-        if repo == "django" and issue_num == "13230":
-            break
-    print(issue_data["instance_id"])
-    # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
-    composio_tool_set = ComposioToolSet()
+        # owner, repo, issue_num = "ElGreKost", "SoftwareDeveloperAgents", "1"
+        composio_tool_set = ComposioToolSet()
 
-    import subprocess
-    faulty_repos_dir = Path(Path.home(), "repos")
-    faulty_repos_dir.mkdir(exist_ok=True, parents=True)
+        import subprocess
 
-    repo_url = f"https://github.com/{owner}/{repo}.git"
-    clone_command = ["git", "clone", repo_url]
-    print(f"Running {' '.join(clone_command)}")
-    subprocess.run(clone_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=faulty_repos_dir)
+        faulty_repos_dir = Path(Path.home(), "repos")
+        faulty_repos_dir.mkdir(exist_ok=True, parents=True)
 
-    repo_path = Path(faulty_repos_dir, Path(repo_url).stem).absolute()
-    checkout_command = ["git", "checkout", commit_hash]
-    print(f"Running  {' '.join(checkout_command)} and moving to error checkpoint")
-    subprocess.run(checkout_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                   cwd=repo_path)
+        repo_url = f"https://github.com/{owner}/{repo}.git"
+        clone_command = ["git", "clone", repo_url]
+        print(f"Running {' '.join(clone_command)}")
+        subprocess.run(clone_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                       cwd=faulty_repos_dir)
 
-    print(f"changing composio working directory to {repo_path}")
-    composio_tool_set.execute_action(
-        action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
-        params={"path": str(repo_path)},
-    )
+        repo_path = Path(faulty_repos_dir, Path(repo_url).stem).absolute()
+        checkout_command = ["git", "checkout", commit_hash]
+        print(f"Running  {' '.join(checkout_command)} and moving to error checkpoint")
+        subprocess.run(checkout_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                       cwd=repo_path)
 
-    crew = ProblemSolversCrew().crew()
-    crew_output = crew.kickoff(inputs=dict(
-        repo=str(repo_path),
-        repo_name=repo,
-        repo_parent=str(repo_path.parent),
-        issue=issue,
-        gold_file_path=str(repo_path) + str(gold_file_path)
-    ))
+        print(f"changing composio working directory to {repo_path}")
+        composio_tool_set.execute_action(
+            action=Action.FILETOOL_CHANGE_WORKING_DIRECTORY,
+            params={"path": str(repo_path)},
+        )
 
-    print(crew_output.raw)
+        crew = ProblemSolversCrew().crew()
+        crew_output = crew.kickoff(inputs=dict(
+            repo=str(repo_path),
+            repo_name=repo,
+            repo_parent=str(repo_path.parent),
+            issue=issue_text,
+            gold_file_path=str(repo_path) + str(gold_file_path)
+        ))
 
-
+        print(crew_output.raw)
